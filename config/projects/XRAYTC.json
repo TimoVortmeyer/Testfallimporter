@@ -1,0 +1,21 @@
+{
+  "project_key": "XRAYTC",
+  "test_issue_type": "Test",
+  "test_type_custom_field": "customfield_15900",
+  "manual_steps_custom_field": "customfield_15903",
+  "manual_test_type_value": "Manual",
+  "required_step_fields": [
+    "system",
+    "action",
+    "expected_result"
+  ],
+  "step_field_mapping": {
+    "system": "System/Komponente",
+    "action": "Action",
+    "data": "Data",
+    "expected_result": "Expected Result",
+    "tester": "Tester"
+  },
+  "xray_api_version": "1.0",
+  "schema_path": "schema/testcase.schema.json"
+}

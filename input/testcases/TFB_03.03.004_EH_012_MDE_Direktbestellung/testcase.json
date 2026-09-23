@@ -1,0 +1,116 @@
+{
+  "summary": "TFB_03.03.004_EH_012_MDE_Direktbestellung",
+  "description": "Erstellen einer Direktbestellung am MDE, Sichern und Synchronisieren der Erfassung über den Storehub an SAP Retail.",
+  "labels": [],
+  "components": [],
+  "custom_fields": {},
+  "screenshots": [],
+  "steps": [
+    {
+      "system": "MDE",
+      "action": "01 Warenwirtschaft → 01 Bestellung → 03 Direktbestellung",
+      "data": "",
+      "expected_result": "Die Maske Empfangsstelle wählen wird angezeigt und enthält alle GK relevanten Empfangsstellen.\nOb alle relevanten Empfangsstellen angezeigt werden, wird mit einem Abgleich der Daten vom RWWS-System eindeutig:\n\n!image-2026-05-08-09-30-39-655.png!\n\n!image-2026-05-08-09-30-53-288.png!",
+      "attachments": [
+        "image-2026-05-08-09-30-39-655.png",
+        "image-2026-05-08-09-30-53-288.png"
+      ]
+    },
+    {
+      "system": "MDE",
+      "action": "Bestellart prüfen",
+      "data": "",
+      "expected_result": "Bestellart steht auf Direktbestellung.",
+      "attachments": []
+    },
+    {
+      "system": "MDE",
+      "action": "Eine Empfangsstelle auswählen und den \"Ok\" Button betätigen.\n\nBei der Auswahl des Lieferdatums:\n * Minimales Lieferdatum = Tag heute",
+      "data": "",
+      "expected_result": "Es wird die Maske \"Direktbest. Liefertermin wählen\" angezeigt.\n\n!image-2026-05-08-09-31-35-087.png!",
+      "attachments": [
+        "image-2026-05-08-09-31-35-087.png"
+      ]
+    },
+    {
+      "system": "MDE",
+      "action": "Einen Liefertermin auswählen und den Button \"Ok\" betätigen.",
+      "data": "",
+      "expected_result": "Die Maske \"Direktbest.- Erfassungsmaske\" wird angezeigt.\n\n!image-2026-05-08-09-32-11-269.png!",
+      "attachments": [
+        "image-2026-05-08-09-32-11-269.png"
+      ]
+    },
+    {
+      "system": "MDE",
+      "action": "Erfassen der Artikel mit Merkmalen gemäß Testfall (17 versch. Artikel).\n\nGgf. muss beim ersten Artikel ein Lieferant ausgewählt werden oder mehrere Bestellungen erzeugt werden, wenn die Testartikel unterschiedliche Lieferanten haben.",
+      "data": "",
+      "expected_result": "Überprüfen der Erfassungsmaske hinsichtlich der Felder Struk, VKP, VKA, AKW, Zeitreihen, Inh, Mg, ME, Standardbestellmengeneinheit sowie des Optionsbuttons und der Detailmaskenauswahl auf die korrekte Anzeige zum jeweiligen Artikel.",
+      "attachments": []
+    },
+    {
+      "system": "MDE",
+      "action": "Bei mehreren Artikeln wird das Scannen als Bestätigung interpretiert. Erfassung des letzten Artikels mit der Betätigen des \"Ok\" oder \"F4\" Buttons abschließen (nur letzter Artikel).",
+      "data": "",
+      "expected_result": "Es wird die leere Maske \"Direktbest. - Erfassungsmaske\" angezeigt.",
+      "attachments": []
+    },
+    {
+      "system": "MDE",
+      "action": "Button \"Position\" betätigen. Prüfen ob die Übersicht alle erfassten Positionen enthält und alle relevanten (Artikel, Lieferant, Artikelbezeichnung, Mg, ME, Restriktion, VK-Wert) Angaben angezeigt werden. Die Spalte BV ist nicht gefüllt",
+      "data": "",
+      "expected_result": "Es wird die Maske \"Direktbest. - Positionsübersicht\" mit allen erfassten Daten korrekt angezeigt.\n!image-2026-05-08-09-32-38-465.png!",
+      "attachments": [
+        "image-2026-05-08-09-32-38-465.png"
+      ]
+    },
+    {
+      "system": "MDE",
+      "action": "Button \"Übersicht\" betätigen.",
+      "data": "",
+      "expected_result": "Es wird die Maske \"Direktbest. - Erfassungsübersicht\" angezeigt. Das Stift-Symbol in der oberen Ecke wird nun rot dargestellt. Die Spalten Erfa-Datum, Empfangsstelle (ES), Lieferdatum und Position werden korrekt angezeigt.\n\n!image-2026-05-08-09-32-57-566.png!",
+      "attachments": [
+        "image-2026-05-08-09-32-57-566.png"
+      ]
+    },
+    {
+      "system": "MDE",
+      "action": "Button \"Sichern\" betätigen.",
+      "data": "",
+      "expected_result": "Die Synchronisation startet automatisch und wird automatisch beendet.\n\n!image-2026-05-08-09-33-27-757.png!\n\nNach dem automatischen Beenden der Synchronisation wird wieder die Empfangsstellenauswahl angezeigt.\n\nDas Stift-Symbol wird bei erfolgreicher Synchronisation wieder weiß dargestellt.\n\n!image-2026-05-08-09-33-40-779.png!\n\nDas MDE hat die Bestellung über den Storehub und die PI als RPO_DATA_TRANSFER IDoc an SAP Retail übertragen.",
+      "attachments": [
+        "image-2026-05-08-09-33-27-757.png",
+        "image-2026-05-08-09-33-40-779.png"
+      ]
+    },
+    {
+      "system": "Portal",
+      "action": "Aufrufen der Bestellübersicht über Einkauf → Disposition → Bestellfreigabe / Bestellübersicht.",
+      "data": "",
+      "expected_result": "Das Webdynpro \"Bestellübersicht\" wird angezeigt.\n\n!image-2026-05-08-09-34-05-784.png!\n\n!image-2026-05-08-09-34-18-788.png!",
+      "attachments": [
+        "image-2026-05-08-09-34-05-784.png",
+        "image-2026-05-08-09-34-18-788.png"
+      ]
+    },
+    {
+      "system": "Portal",
+      "action": "Button Daten Anzeigen drücken.",
+      "data": "",
+      "expected_result": "Die Bestellbelege werden angezeigt. Für die erfassten Artikel wurden eine oder mehrere Bestellungen mit der Belegart YDRK, dem Status autom.freigegeben, dem Bestelldatum als Tagesdatum, der Bestelluhrzeit 00:00:00 und dem Liefertermin gemäß der Auswahl angezeigt. Freigabezeitpunkt = Sichern am MDE +/- Sekunden.\n\nLagerbestellungen werden mit einer Submissionsnummer angezeigt (6-stellig und führend mit \"1\"). Streckenbestellung mit der Belegnummer (10-stellig und führend mit \"2\").\n!image-2026-05-08-09-35-17-304.png!",
+      "attachments": [
+        "image-2026-05-08-09-35-17-304.png"
+      ]
+    },
+    {
+      "system": "Portal",
+      "action": "Markieren des Bestellbeleges (bzw. der Belege) und Button !image-2026-05-08-09-35-40-174.png! oder auf die Belegnummer drücken.",
+      "data": "",
+      "expected_result": "Die Bestellung enthält die jeweiligen Artikel mit den eingegebenen Mengen und Mengeneinheiten.\n\n!image-2026-05-08-09-35-53-529.png!",
+      "attachments": [
+        "image-2026-05-08-09-35-40-174.png",
+        "image-2026-05-08-09-35-53-529.png"
+      ]
+    }
+  ]
+}

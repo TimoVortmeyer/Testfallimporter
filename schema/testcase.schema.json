@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/testfallimporter/testcase.schema.json",
+  "title": "Xray manual test case",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "steps"],
+  "properties": {
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
+    "labels": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    },
+    "components": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    },
+    "custom_fields": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^customfield_[0-9]+$"
+      },
+      "additionalProperties": true
+    },
+    "screenshots": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/screenshot"},
+      "uniqueItems": true
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/step"}
+    }
+  },
+  "$defs": {
+    "screenshot": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^/\\\\]+\\.(png|jpe?g|gif|webp)$"
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["system", "action", "expected_result"],
+      "properties": {
+        "system": {"type": "string"},
+        "action": {"type": "string", "minLength": 1},
+        "data": {"type": "string"},
+        "expected_result": {"type": "string", "minLength": 1},
+        "tester": {"type": "string"},
+        "attachments": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/screenshot"},
+          "uniqueItems": true
+        },
+        "screenshots": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/screenshot"},
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

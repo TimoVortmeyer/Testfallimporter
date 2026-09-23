@@ -1,0 +1,7 @@
+{
+  "jira_base_url": "https://jira.ez.edeka.net/",
+  "project_profile": "config/projects/XRAYTC.json",
+  "testcases_dir": "input/testcases",
+  "testcase_filename": "testcase.json",
+  "screenshots_dirname": "screenshots"
+}
