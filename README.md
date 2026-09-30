@@ -158,6 +158,39 @@ JSON-Schema zulässig.
 python -m xray_import.import_testcases
 ```
 
+### Konfiguration per Kommandozeile überschreiben
+
+Werte aus `config/import_config.json` und dem Projektprofil können beim Aufruf
+überschrieben werden. Es gilt: Kommandozeile vor Umgebungsvariable vor
+Konfigurationsdatei.
+
+| Option                  | Überschreibt          |
+|-------------------------|-----------------------|
+| `--config`              | Pfad zur Import-Konfiguration |
+| `--jira-base-url`       | `jira_base_url`       |
+| `--project-profile`     | `project_profile`     |
+| `--testcases-dir`       | `testcases_dir`       |
+| `--testcase-filename`   | `testcase_filename`   |
+| `--screenshots-dirname` | `screenshots_dirname` |
+| `--schema`              | `schema_path`         |
+| `--project-key`         | `project_key`         |
+| `--test-issue-type`     | `test_issue_type`     |
+| `--pat`                 | Umgebungsvariable `JIRA_PAT` |
+
+Beispiel:
+
+```powershell
+python -m xray_import.import_testcases `
+	--testcases-dir ..\Testfallkonverter\output `
+	--project-key XRAYTC `
+	--pat
+```
+
+Alle Optionen zeigt `python -m xray_import.import_testcases --help`.
+`--pat` ohne Wert fragt das Token verdeckt ab (empfohlen). `--pat <token>`
+wird ebenfalls akzeptiert, das Token ist dann aber im Shell-Verlauf und in der
+Prozessliste sichtbar.
+
 Vor dem Import werden alle Testfälle gegen das Schema des Projektprofils
 validiert. Zusätzlich prüft ein Preflight Projekt, Issue-Typ, Jira-Felder und
 den konfigurierten Xray-Endpunkt. Fehler werden mit Datei/Feldpfad oder

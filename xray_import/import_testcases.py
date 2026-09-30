@@ -6,6 +6,7 @@ Nutzung:
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import logging
 import sys
@@ -51,11 +52,9 @@ def import_testcase(
     return issue_key
 
 
-def run(config_path: Path) -> int:
+def run(config_path: Path, overrides: dict[str, object] | None = None) -> int:
     try:
-        with config_path.open("r", encoding="utf-8") as f:
-            import_config = json.load(f)
-        settings = load_import_settings(config_path)
+        settings = load_import_settings(config_path, overrides)
         testcases_dir = Path(settings["testcases_dir"])
         schema_path = Path(settings["schema_path"])
         testcases = load_testcases(
@@ -65,7 +64,7 @@ def run(config_path: Path) -> int:
             str(settings["testcase_filename"]),
             str(settings["screenshots_dirname"]),
         )
-        config = load_config(config_path)
+        config = load_config(config_path, overrides)
     except (KeyError, OSError, json.JSONDecodeError, TestCaseValidationError, RuntimeError) as exc:
         logger.error("Konfigurations-/Eingabefehler: %s", exc)
         return 1
@@ -104,32 +103,63 @@ def run(config_path: Path) -> int:
     return 1 if had_error else 0
 
 
+# (CLI-Option, Konfigurationsschlüssel, Hilfetext)
+CONFIG_OVERRIDE_OPTIONS = (
+    ("--jira-base-url", "jira_base_url", "Basis-URL der Jira-Instanz"),
+    ("--project-profile", "project_profile", "Pfad zum Projektprofil"),
+    ("--testcases-dir", "testcases_dir", "Verzeichnis mit den Testfall-Ordnern"),
+    ("--testcase-filename", "testcase_filename", "Dateiname der Testfall-JSON"),
+    ("--screenshots-dirname", "screenshots_dirname", "Name des Screenshot-Ordners"),
+    ("--schema", "schema_path", "Pfad zum JSON Schema der Testfälle"),
+    ("--project-key", "project_key", "Jira-Projektschlüssel"),
+    ("--test-issue-type", "test_issue_type", "Name des Test-Issue-Typs"),
+)
+PROMPT_FOR_PAT = object()
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Import von Testfällen nach Jira/Xray")
+    parser = argparse.ArgumentParser(
+        description="Import von Testfällen nach Jira/Xray",
+        epilog="Kommandozeilenwerte haben Vorrang vor Umgebungsvariablen "
+        "und Werten aus der Konfigurationsdatei.",
+    )
     parser.add_argument(
         "--config",
         type=Path,
         default=Path("config/import_config.json"),
         help="Zentrale Import-Konfiguration",
     )
+    for option, key, help_text in CONFIG_OVERRIDE_OPTIONS:
+        parser.add_argument(
+            option,
+            dest=key,
+            default=None,
+            help=f"{help_text} (überschreibt '{key}' aus der Konfiguration)",
+        )
     parser.add_argument(
-        "--schema",
-        type=Path,
+        "--pat",
+        nargs="?",
+        const=PROMPT_FOR_PAT,
         default=None,
-        help="Optionales Überschreiben des in der Konfiguration angegebenen JSON Schemas",
+        help="Jira Personal Access Token (überschreibt JIRA_PAT). Ohne Wert "
+        "wird das Token verdeckt abgefragt; ein direkt angegebener Wert ist "
+        "im Shell-Verlauf und in der Prozessliste sichtbar.",
     )
     args = parser.parse_args()
-    if args.schema is not None:
-        with args.config.open("r", encoding="utf-8") as f:
-            import_config = json.load(f)
-        import_config["schema_path"] = str(args.schema)
-        temporary_config = args.config.with_name(".import_config.runtime.json")
-        temporary_config.write_text(json.dumps(import_config), encoding="utf-8")
-        try:
-            return run(temporary_config)
-        finally:
-            temporary_config.unlink(missing_ok=True)
-    return run(args.config)
+    overrides: dict[str, object] = {
+        key: getattr(args, key)
+        for _, key, _ in CONFIG_OVERRIDE_OPTIONS
+        if getattr(args, key) is not None
+    }
+    if args.pat == PROMPT_FOR_PAT:
+        overrides["personal_access_token"] = getpass.getpass("Jira PAT: ")
+    elif args.pat is not None:
+        logger.warning(
+            "PAT wurde als Argument übergeben und ist im Shell-Verlauf sichtbar. "
+            "Sicherer: --pat ohne Wert (verdeckte Eingabe) oder JIRA_PAT."
+        )
+        overrides["personal_access_token"] = args.pat
+    return run(args.config, overrides)
 
 
 if __name__ == "__main__":

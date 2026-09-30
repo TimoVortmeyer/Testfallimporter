@@ -1,7 +1,7 @@
 """Zentrale Konfiguration für den Xray-Import.
 
-Sensible Werte (PAT) werden ausschliesslich über Umgebungsvariablen gelesen,
-niemals hier im Klartext hinterlegt.
+Sensible Werte (PAT) kommen aus ``--pat`` oder der Umgebungsvariable JIRA_PAT,
+niemals aus Konfigurationsdateien.
 """
 import os
 import json
@@ -29,29 +29,50 @@ class Config:
     xray_api_version: str = "1.0"
 
 
-def load_import_settings(import_config_path: Path) -> dict[str, object]:
+def load_import_settings(
+    import_config_path: Path,
+    overrides: dict[str, object] | None = None,
+) -> dict[str, object]:
+    """Lädt Import-Konfiguration und Projektprofil; ``overrides`` haben Vorrang vor beiden."""
+    overrides = overrides or {}
     with import_config_path.open("r", encoding="utf-8") as f:
         import_config = json.load(f)
-    profile_path = Path(import_config["project_profile"])
+    profile_path = Path(overrides.get("project_profile", import_config["project_profile"]))
     with profile_path.open("r", encoding="utf-8") as f:
         profile = json.load(f)
-    return {**import_config, **profile}
+    return {**import_config, **profile, **overrides}
 
 
-def load_config(import_config_path: Path = Path("config/import_config.json")) -> Config:
-    import_config = load_import_settings(import_config_path)
+def _setting(
+    settings: dict[str, object],
+    overrides: dict[str, object],
+    key: str,
+    env_var: str,
+) -> str:
+    """Reihenfolge: Kommandozeile > Umgebungsvariable > Konfigurationsdatei."""
+    if key in overrides:
+        return str(overrides[key])
+    return os.environ.get(env_var, str(settings[key]))
 
-    base_url = os.environ.get("JIRA_BASE_URL", import_config["jira_base_url"])
-    project_key = os.environ.get("JIRA_PROJECT_KEY", import_config["project_key"])
-    test_issue_type = os.environ.get(
-        "JIRA_TEST_ISSUE_TYPE", import_config["test_issue_type"]
+
+def load_config(
+    import_config_path: Path = Path("config/import_config.json"),
+    overrides: dict[str, object] | None = None,
+) -> Config:
+    overrides = overrides or {}
+    import_config = load_import_settings(import_config_path, overrides)
+
+    base_url = _setting(import_config, overrides, "jira_base_url", "JIRA_BASE_URL")
+    project_key = _setting(import_config, overrides, "project_key", "JIRA_PROJECT_KEY")
+    test_issue_type = _setting(
+        import_config, overrides, "test_issue_type", "JIRA_TEST_ISSUE_TYPE"
     )
-    pat = os.environ.get("JIRA_PAT")
+    pat = overrides.get("personal_access_token") or os.environ.get("JIRA_PAT")
 
     if not pat:
         raise RuntimeError(
-            "Umgebungsvariable JIRA_PAT ist nicht gesetzt. "
-            "Bitte ein Personal Access Token aus Jira hinterlegen."
+            "Kein Jira-PAT angegeben. Bitte --pat verwenden oder die "
+            "Umgebungsvariable JIRA_PAT setzen."
         )
 
     return Config(
