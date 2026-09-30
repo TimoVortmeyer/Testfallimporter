@@ -8,6 +8,7 @@ import logging
 import requests
 
 from .config import Config
+from .diagnostics import response_diagnostics
 from .models import TestStep
 
 logger = logging.getLogger(__name__)
@@ -38,7 +39,7 @@ class JiraClient:
         if project_response.status_code != 200:
             raise JiraApiError(
                 f"Zielprojekt {self._config.project_key} nicht erreichbar "
-                f"({project_response.status_code}): {project_response.text}"
+                f"({response_diagnostics(project_response)})"
             )
 
         meta_response = self._session.get(
@@ -64,7 +65,7 @@ class JiraClient:
             if type_response.status_code != 200:
                 raise JiraApiError(
                     f"Issue-Typ {self._config.test_issue_type} konnte nicht geprüft werden "
-                    f"({type_response.status_code}): {type_response.text}"
+                    f"({response_diagnostics(type_response)})"
                 )
             issue_types = [issue_type.get("name") for issue_type in type_response.json()]
             logger.warning(
@@ -73,7 +74,7 @@ class JiraClient:
         else:
             raise JiraApiError(
                 f"Issue-Typ {self._config.test_issue_type} konnte nicht geprüft werden "
-                f"({meta_response.status_code}): {meta_response.text}"
+                f"({response_diagnostics(meta_response)})"
             )
         if self._config.test_issue_type not in issue_types:
             raise JiraApiError(
@@ -88,7 +89,7 @@ class JiraClient:
         if fields_response.status_code != 200:
             raise JiraApiError(
                 f"Jira-Felder konnten nicht geprüft werden "
-                f"({fields_response.status_code}): {fields_response.text}"
+                f"({response_diagnostics(fields_response)})"
             )
         field_ids = {field.get("id") for field in fields_response.json()}
         for field_id in (
@@ -138,7 +139,7 @@ class JiraClient:
         )
         if response.status_code != 201:
             raise JiraApiError(
-                f"Anlegen des Test-Issues fehlgeschlagen ({response.status_code}): {response.text}"
+                f"Anlegen des Test-Issues fehlgeschlagen ({response_diagnostics(response)})"
             )
         issue_key = response.json()["key"]
         self.update_test_steps(issue_key, steps)
@@ -168,6 +169,17 @@ class JiraClient:
             fields[mapping["tester"]] = step.tester
         return fields
 
+    @staticmethod
+    def _payload_diagnostics(steps_value: dict[str, Any]) -> str:
+        details = []
+        for item in steps_value["steps"]:
+            fields = ", ".join(
+                f"{name} ({len(value)} Zeichen)"
+                for name, value in item["fields"].items()
+            )
+            details.append(f"Step {item['index']}: {fields}")
+        return "; ".join(details)
+
     def update_test_steps(self, issue_key: str, steps: list[TestStep]) -> None:
         """Schreibt die Manual-Steps nach dem Issue-Create über Jira REST."""
         steps_value = self._steps_value(steps)
@@ -191,7 +203,8 @@ class JiraClient:
         if response.status_code not in (200, 204):
             raise JiraApiError(
                 f"Schritte für {issue_key} konnten nicht gespeichert werden "
-                f"({response.status_code}): {response.text}"
+                f"({response_diagnostics(response)}). "
+                f"Payload-Struktur: {self._payload_diagnostics(steps_value)}"
             )
 
         verify_response = self._session.get(
@@ -207,18 +220,39 @@ class JiraClient:
         if verify_response.status_code != 200:
             raise JiraApiError(
                 f"Schritte für {issue_key} konnten nicht verifiziert werden "
-                f"({verify_response.status_code}): {verify_response.text}"
+                f"({response_diagnostics(verify_response)})"
             )
 
-        stored_field = verify_response.json().get("fields", {}).get(
+        try:
+            verify_body = verify_response.json()
+        except requests.exceptions.JSONDecodeError as exc:
+            raise JiraApiError(
+                f"Jira lieferte bei der Verifikation von {issue_key} kein gültiges JSON "
+                f"({response_diagnostics(verify_response)})"
+            ) from exc
+
+        stored_field = verify_body.get("fields", {}).get(
             self._config.manual_steps_custom_field, {}
         )
         stored_steps = stored_field.get("steps", []) if isinstance(stored_field, dict) else []
         logger.info("Manual-Steps-Verifikation für %s: %d Schritt(e)", issue_key, len(stored_steps))
         if len(stored_steps) < len(steps):
+            xray_response = self._session.get(
+                f"{self._config.jira_base_url}/rest/raven/"
+                f"{self._config.xray_api_version}/api/test/{issue_key}/step",
+                timeout=self._config.request_timeout,
+            )
             raise JiraApiError(
-                f"Jira hat für {issue_key} nur {len(stored_steps)} von "
-                f"{len(steps)} Manual-Step(s) gespeichert"
+                f"Jira/Xray hat für {issue_key} nur {len(stored_steps)} von "
+                f"{len(steps)} Manual-Step(s) gespeichert. Das Jira-Update wurde akzeptiert "
+                f"({response_diagnostics(response)}), aber das Manual-Steps-Feld "
+                f"'{self._config.manual_steps_custom_field}' enthält danach zu wenige Schritte. "
+                f"Xray-Gegenprüfung: {response_diagnostics(xray_response)}. "
+                f"Gesendete Payload-Struktur: {self._payload_diagnostics(steps_value)}. "
+                "Wahrscheinliche Ursache: Xray hat mindestens einen Feldnamen oder Feldwert "
+                "des Step-Payloads abgelehnt. Jira Data Center liefert bei diesem Fehler "
+                "häufig keinen konkreteren Fehlertext. Prüfe step_field_mapping und vergleiche "
+                "die genannten Felder mit einem funktionierenden Referenztestfall."
             )
 
     def upload_attachment(self, issue_key: str, file_path: Path) -> None:
@@ -236,5 +270,5 @@ class JiraClient:
         if response.status_code != 200:
             raise JiraApiError(
                 f"Upload von '{file_path.name}' an {issue_key} fehlgeschlagen "
-                f"({response.status_code}): {response.text}"
+                f"({response_diagnostics(response)})"
             )

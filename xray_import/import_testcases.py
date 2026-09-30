@@ -11,6 +11,8 @@ import logging
 import sys
 from pathlib import Path
 
+import requests
+
 from .config import load_config, load_import_settings
 from .jira_client import JiraApiError, JiraClient
 from .models import TestCase, TestCaseValidationError, load_testcases
@@ -73,7 +75,7 @@ def run(config_path: Path) -> int:
     try:
         jira.preflight()
         xray.preflight()
-    except (JiraApiError, XrayApiError) as exc:
+    except (JiraApiError, XrayApiError, requests.RequestException) as exc:
         logger.error("Preflight fehlgeschlagen: %s", exc)
         return 1
     created_keys: list[str] = []
@@ -83,9 +85,20 @@ def run(config_path: Path) -> int:
             screenshots_dir = testcase_dir / str(settings["screenshots_dirname"])
             key = import_testcase(testcase, jira, xray, screenshots_dir)
             created_keys.append(key)
-        except (JiraApiError, XrayApiError, FileNotFoundError) as exc:
+        except (
+            JiraApiError,
+            XrayApiError,
+            FileNotFoundError,
+            requests.RequestException,
+        ) as exc:
             had_error = True
-            logger.error("Fehler bei Testfall '%s': %s", testcase.summary, exc)
+            logger.error(
+                "Fehler bei Testfall '%s' (%s): %s: %s",
+                testcase.summary,
+                testcase_dir / str(settings["testcase_filename"]),
+                type(exc).__name__,
+                exc,
+            )
 
     logger.info("Fertig. Angelegte Test-Issues: %s", ", ".join(created_keys) or "keine")
     return 1 if had_error else 0

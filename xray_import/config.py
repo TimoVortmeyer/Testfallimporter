@@ -23,7 +23,6 @@ class Config:
     step_field_mapping: dict[str, str] = field(default_factory=lambda: {
         "system": "System/Komponente",
         "action": "Action",
-        "data": "Data",
         "expected_result": "Expected Result",
         "tester": "Tester",
     })

@@ -43,8 +43,7 @@ Ein minimaler Referenztestfall kann beispielsweise so aussehen:
 	"steps": [
 		{
 			"system": "Feldwert System/Komponente",
-			"action": "Feldwert Aktion",
-			"data": "Feldwert Data",
+			"action": "Feldwert Aktion und benötigte Testdaten",
 			"expected_result": "Feldwert Expected Result",
 			"tester": "",
 			"attachments": []
@@ -63,7 +62,6 @@ jeweiligen Jira-Feld benannt werden:
 
 - `System/Komponente`: `Feldwert System/Komponente`
 - `Action`: `Feldwert Aktion`
-- `Data`: `Feldwert Data`
 - `Expected Result`: `Feldwert Expected Result`
 - `Tester`: `Feldwert Tester` oder leer, wenn das Feld nicht geprüft werden soll
 - `attachments`: `referenz-step-01.png`, `referenz-step-02.png`
@@ -136,13 +134,23 @@ Custom-Field-IDs, Step-IDs, verfügbaren Feldoperationen und Attachment-Daten.
 
 Screenshots werden in Textfeldern des Testfalls über Jira-Wiki-Markup verankert,
 zum Beispiel `!login.png!`. Das Bild muss im jeweiligen `screenshots`-Ordner
-liegen. Unterstützte Schrittfelder sind `system`, `action`, `data`,
+liegen. Das Eingabeformat kennt die Schrittfelder `system`, `action`, `data`,
 `expected_result`, `tester` und `attachments`. `system`, `action` und
-`expected_result` sind Pflichtfelder. `tester` und `attachments` sind optional;
-es gibt keine automatischen Standardwerte. Die Dateien aus `attachments` werden
+`expected_result` sind Pflichtfelder. Die übrigen Felder sind optional und
+werden nur übertragen, wenn das aktive Projektprofil sie abbildet; es gibt
+keine automatischen Standardwerte. Die Dateien aus `attachments` werden
 zusätzlich direkt an den jeweiligen Xray-Testschritt angehängt.
 Projektabhängige Jira-Felder können über `custom_fields` mit ihren IDs
 (`customfield_12345`) gesetzt werden.
+
+Welche optionalen Schrittfelder an Xray übertragen werden, legt
+`step_field_mapping` im Projektprofil fest. Nicht konfigurierte Felder werden
+beim Erzeugen des Xray-Payloads ausgelassen. Im Profil `XRAYTC` ist `data`
+absichtlich nicht gemappt: Die dort vorhandene Xray-Spalte `Data` verwirft beim
+Import das gesamte Manual-Steps-Paket, obwohl Jira das Update mit HTTP 204
+bestätigt. Benötigte Testdaten müssen für dieses Projekt im Feld `action`
+beschrieben werden. Ein leerer `data`-Wert bleibt aus Kompatibilitätsgründen im
+JSON-Schema zulässig.
 
 ## Ausführen
 
@@ -162,7 +170,29 @@ das Expected Result des jeweiligen Schritts ein, sodass sie in Xray sichtbar
 sind. Die manuellen Schritte werden beim Anlegen des Jira-Issues im konfigurierten
 Manual-Steps-Custom-Field mit den projektspezifischen Step-Feldern übertragen.
 
+### Fehlerdiagnose
+
+Fehlermeldungen nennen den betroffenen Testfall einschließlich Quelldatei und
+Fehlertyp. Wenn Jira ein Manual-Steps-Update akzeptiert, Xray aber weniger
+Schritte speichert, führt der Importer zusätzlich eine Abfrage über die
+Xray-Step-API aus. Die Meldung enthält dann:
+
+- HTTP-Status und Antworttext von Jira und Xray,
+- eine von Jira gelieferte Request-ID für die serverseitige Protokollsuche,
+- die erwartete und tatsächlich gespeicherte Anzahl von Schritten,
+- die gesendeten Step-Feldnamen und deren Zeichenlängen sowie
+- einen Hinweis auf das zu prüfende `step_field_mapping`.
+
+Feldinhalte, Zugangsdaten und Attachment-Daten werden in der Fehlerdiagnose
+nicht ausgegeben. Liefert Jira trotz eines verworfenen Xray-Payloads nur HTTP
+204 ohne Fehlertext, kann der Importer die serverinterne Ursache nicht sicher
+bestimmen; die Request-ID und Payload-Struktur grenzen den Fehler für die
+Jira-/Xray-Administration ein.
+
 ## Bekannte Einschränkungen
 
 - Es werden aktuell nur **neue** Testfälle angelegt (kein Update bestehender Issues).
-- Es wird von einem manuellen Testtyp mit Steps (Action/Data/Expected Result) ausgegangen.
+- Es wird von einem manuellen Testtyp mit projektspezifisch gemappten
+	Schrittfeldern ausgegangen.
+- Das Projektprofil `XRAYTC` überträgt kein separates `Data`-Schrittfeld;
+	Testdaten werden in `action` dokumentiert.

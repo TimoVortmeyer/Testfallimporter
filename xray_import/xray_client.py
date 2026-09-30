@@ -9,6 +9,7 @@ from typing import Any
 import requests
 
 from .config import Config
+from .diagnostics import response_diagnostics
 from .models import TestStep
 
 logger = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ class XrayClient:
         if response.status_code != 200:
             raise XrayApiError(
                 f"Xray-API {self._config.xray_api_version} nicht erreichbar "
-                f"({response.status_code}): {response.text}"
+                f"({response_diagnostics(response)})"
             )
         logger.info("Xray-Preflight erfolgreich: API %s", self._config.xray_api_version)
 
@@ -63,7 +64,7 @@ class XrayClient:
         if response.status_code != 200:
             raise XrayApiError(
                 f"Steps für {test_issue_key} konnten nicht gelesen werden "
-                f"({response.status_code}): {response.text}"
+                f"({response_diagnostics(response)})"
             )
 
         response_body = response.json()
@@ -100,5 +101,5 @@ class XrayClient:
                     raise XrayApiError(
                         f"Attachment '{filename}' konnte nicht an Step {step_index} "
                         f"von {test_issue_key} angehängt werden "
-                        f"({upload_response.status_code}): {upload_response.text}"
+                        f"({response_diagnostics(upload_response)})"
                     )

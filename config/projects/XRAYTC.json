@@ -12,7 +12,6 @@
   "step_field_mapping": {
     "system": "System/Komponente",
     "action": "Action",
-    "data": "Data",
     "expected_result": "Expected Result",
     "tester": "Tester"
   },

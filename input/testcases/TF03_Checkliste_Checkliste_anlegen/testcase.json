@@ -1,0 +1,70 @@
+{
+  "summary": "TFB_003-Checkliste_anlegen",
+  "description": "Kurzbeschreibung:\nAnlage einer neuen Checkliste mit zwei Listenpunkten und unterschiedlichen Terminen.\n\nTestfallpriorität:\n3 (Mittel)\n\nVorbedingungen:\nDas Testsystem „EDEKA next“ ist erreichbar.\nGültige Zugangsdaten liegen vor.\n\nBenötigte Testdaten:\n[[Benutzername]], [[Passwort]], Checklistenname „Checkliste_2026_09_29-12_48_01“, Listenpunkt „Eintrag 1“ mit Datum „29.09.2026“, Listenpunkt „Eintrag 2“ mit Datum „30.09.2026“\n\nZiel des Tests:\nDie neue Checkliste wird mit den erfassten Listenpunkten und Terminen gespeichert und unter „Meine Checklisten“ angezeigt.",
+  "labels": [],
+  "components": [],
+  "custom_fields": {},
+  "screenshots": [
+    "01_Login.png",
+    "2026-09-29_12_42_00-EIT-TA.png",
+    "2026-09-29_12_42_34-EIT-TA.png",
+    "2026-09-29_12_48_53-EIT-TA.png",
+    "2026-09-29_12_50_20-EIT-TA.png",
+    "2026-09-29_12_50_56-EIT-TA.png",
+    "9999_Logout.png"
+  ],
+  "steps": [
+    {
+      "system": "EDEKA IT – Anmeldemaske",
+      "action": "Anmeldemaske öffnen.\nFeld „Benutzername“ mit [[Benutzername]] befüllen.\nFeld „Passwort“ mit [[Passwort]] befüllen.\n!01_Login.png!\nSchaltfläche „LOGIN“ betätigen.",
+      "data": "[[Benutzername]], [[Passwort]]",
+      "expected_result": "Der Benutzer wird angemeldet.\nDie Startseite von „EDEKA next“ wird angezeigt.",
+      "tester": "",
+      "attachments": [
+        "01_Login.png"
+      ]
+    },
+    {
+      "system": "EDEKA next – Hauptmenü",
+      "action": "Menü öffnen.\n!2026-09-29_12_42_00-EIT-TA.png!\nMenüpunkt „Meine Checklisten“ auswählen.",
+      "data": "",
+      "expected_result": "Die Seite „Meine Checklisten“ wird angezeigt.",
+      "tester": "",
+      "attachments": [
+        "2026-09-29_12_42_00-EIT-TA.png"
+      ]
+    },
+    {
+      "system": "EDEKA next – Meine Checklisten",
+      "action": "Schaltfläche „Neue Checkliste“ betätigen.\n!2026-09-29_12_42_34-EIT-TA.png!",
+      "data": "",
+      "expected_result": "Der Dialog „Neue Checkliste“ wird angezeigt.",
+      "tester": "",
+      "attachments": [
+        "2026-09-29_12_42_34-EIT-TA.png"
+      ]
+    },
+    {
+      "system": "EDEKA next – Dialog „Neue Checkliste“",
+      "action": "Feld für den Checklistenname mit „Checkliste_2026_09_29-12_48_01“ befüllen.\nFeld für den ersten Listenpunkt mit „Eintrag 1“ befüllen.\nDatumsfeld des ersten Listenpunkts mit „29.09.2026“ befüllen.\n!2026-09-29_12_48_53-EIT-TA.png!\nSchaltfläche „Neuer Listenpunkt“ betätigen.\nFeld für den zweiten Listenpunkt mit „Eintrag 2“ befüllen.\nDatumsfeld des zweiten Listenpunkts mit „30.09.2026“ befüllen.\n!2026-09-29_12_50_20-EIT-TA.png!\nSchaltfläche „SPEICHERN“ betätigen.",
+      "data": "Checklistenname „Checkliste_2026_09_29-12_48_01“, Listenpunkt „Eintrag 1“, Datum „29.09.2026“, Listenpunkt „Eintrag 2“, Datum „30.09.2026“",
+      "expected_result": "Der Dialog wird geschlossen.\nDie Checkliste „Checkliste_2026_09_29-12_48_01“ wird gespeichert.\nDie Checkliste wird unter „Meine Checklisten“ angezeigt.\nDer Listenpunkt „Eintrag 1“ wird mit dem Datum „29.09.2026“ angezeigt.\nDer Listenpunkt „Eintrag 2“ wird mit dem Datum „30.09.2026“ angezeigt.\n!2026-09-29_12_50_56-EIT-TA.png!",
+      "tester": "",
+      "attachments": [
+        "2026-09-29_12_48_53-EIT-TA.png",
+        "2026-09-29_12_50_20-EIT-TA.png",
+        "2026-09-29_12_50_56-EIT-TA.png"
+      ]
+    },
+    {
+      "system": "EDEKA next – Benutzermenü",
+      "action": "Benutzermenü öffnen.\n!9999_Logout.png!\nMenüpunkt „Ausloggen“ auswählen.",
+      "data": "",
+      "expected_result": "Der Benutzer wird abgemeldet.\nDie Sitzung wird beendet.",
+      "tester": "",
+      "attachments": [
+        "9999_Logout.png"
+      ]
+    }
+  ]
+}
