@@ -37,6 +37,7 @@ def import_testcase(
         components=testcase.components,
         custom_fields=testcase.custom_fields,
         steps=testcase.steps,
+        repository_path=testcase.repository_path,
     )
     logger.info("Test-Issue angelegt: %s (%s)", issue_key, testcase.summary)
 

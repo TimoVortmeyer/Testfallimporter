@@ -13,6 +13,10 @@
     "description": {
       "type": "string"
     },
+    "repository_path": {
+      "type": "string",
+      "pattern": "^/[^/]+(/[^/]+)*$"
+    },
     "labels": {
       "type": "array",
       "items": {"type": "string", "minLength": 1},

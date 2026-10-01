@@ -95,8 +95,9 @@ class JiraClient:
         for field_id in (
             self._config.manual_steps_custom_field,
             self._config.test_type_custom_field,
+            self._config.repository_path_custom_field,
         ):
-            if field_id not in field_ids:
+            if field_id and field_id not in field_ids:
                 raise JiraApiError(f"Konfiguriertes Jira-Feld nicht gefunden: {field_id}")
 
         logger.info(
@@ -113,6 +114,7 @@ class JiraClient:
         components: list[str],
         custom_fields: dict[str, Any],
         steps: list[TestStep],
+        repository_path: str | None = None,
     ) -> str:
         """Legt einen neuen Test-Issue an und gibt den Issue-Key zurück."""
         fields: dict[str, Any] = {
@@ -125,6 +127,15 @@ class JiraClient:
         if components:
             fields["components"] = [{"name": component} for component in components]
         fields.update(custom_fields)
+        if repository_path is not None:
+            field_id = self._config.repository_path_custom_field
+            if not field_id:
+                raise JiraApiError("Kein repository_path_custom_field im Projektprofil konfiguriert")
+            if field_id in custom_fields and custom_fields[field_id] != repository_path:
+                raise JiraApiError(
+                    f"repository_path widerspricht custom_fields.{field_id}"
+                )
+            fields[field_id] = repository_path
         fields.setdefault(
             self._config.test_type_custom_field,
             {"value": self._config.manual_test_type_value},
@@ -142,8 +153,30 @@ class JiraClient:
                 f"Anlegen des Test-Issues fehlgeschlagen ({response_diagnostics(response)})"
             )
         issue_key = response.json()["key"]
+        if repository_path is not None:
+            self.verify_repository_path(issue_key, repository_path)
         self.update_test_steps(issue_key, steps)
         return issue_key
+
+    def verify_repository_path(self, issue_key: str, expected_path: str) -> None:
+        field_id = self._config.repository_path_custom_field
+        response = self._session.get(
+            f"{self._config.jira_base_url}/rest/api/2/issue/{issue_key}",
+            params={"fields": field_id},
+            timeout=self._config.request_timeout,
+        )
+        if response.status_code != 200:
+            raise JiraApiError(
+                f"Repository-Pfad für angelegten Issue {issue_key} konnte nicht geprüft werden "
+                f"({response_diagnostics(response)})"
+            )
+        stored_path = response.json().get("fields", {}).get(field_id)
+        if stored_path != expected_path:
+            raise JiraApiError(
+                f"Repository-Pfad für angelegten Issue {issue_key} wurde nicht gespeichert "
+                f"(Feld {field_id}). Jira/Xray muss das Feld beim Anlegen unterstützen; "
+                "bitte den Issue vor einem erneuten Import prüfen."
+            )
 
     def _steps_value(self, steps: list[TestStep]) -> dict[str, Any]:
         return {

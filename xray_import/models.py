@@ -40,6 +40,7 @@ class TestStep:
 class TestCase:
     summary: str
     description: str = ""
+    repository_path: str | None = None
     labels: list[str] = field(default_factory=list)
     components: list[str] = field(default_factory=list)
     custom_fields: dict[str, Any] = field(default_factory=dict)
@@ -55,6 +56,7 @@ class TestCase:
         return TestCase(
             summary=raw["summary"],
             description=raw.get("description", ""),
+            repository_path=raw.get("repository_path"),
             labels=raw.get("labels", []),
             components=raw.get("components", []),
             custom_fields=raw.get("custom_fields", {}),

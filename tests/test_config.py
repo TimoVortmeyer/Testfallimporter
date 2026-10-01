@@ -40,6 +40,7 @@ class ConfigOverrideTest(unittest.TestCase):
             "test_issue_type": "Test",
             "test_type_custom_field": "customfield_1",
             "manual_steps_custom_field": "customfield_2",
+            "repository_path_custom_field": "customfield_15909",
             "manual_test_type_value": "Manual",
             "step_field_mapping": {"action": "Action"},
             "xray_api_version": "1.0",
@@ -73,6 +74,7 @@ class ConfigOverrideTest(unittest.TestCase):
         self.assertEqual(from_env.project_key, "PROFILE")
         self.assertEqual(from_cli.jira_base_url, "https://cli.example.test")
         self.assertEqual(from_cli.project_key, "CLI")
+        self.assertEqual(from_cli.repository_path_custom_field, "customfield_15909")
 
     def test_cli_pat_overrides_environment(self) -> None:
         with patch.dict(os.environ, {"JIRA_PAT": "env-token"}, clear=True):

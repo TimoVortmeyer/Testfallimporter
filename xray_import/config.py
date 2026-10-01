@@ -27,6 +27,7 @@ class Config:
         "tester": "Tester",
     })
     xray_api_version: str = "1.0"
+    repository_path_custom_field: str | None = None
 
 
 def load_import_settings(
@@ -85,4 +86,5 @@ def load_config(
         personal_access_token=pat,
         step_field_mapping=import_config["step_field_mapping"],
         xray_api_version=import_config["xray_api_version"],
+        repository_path_custom_field=import_config.get("repository_path_custom_field"),
     )

@@ -3,6 +3,7 @@
   "test_issue_type": "Test",
   "test_type_custom_field": "customfield_15900",
   "manual_steps_custom_field": "customfield_15903",
+  "repository_path_custom_field": "customfield_15909",
   "manual_test_type_value": "Manual",
   "required_step_fields": [
     "system",

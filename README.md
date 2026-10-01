@@ -71,8 +71,8 @@ Wert zugeordnet ist. Für fachliche Testfälle sollten anschließend echte,
 fachlich verständliche Werte verwendet werden; die Feldwert-Nomenklatur ist
 vor allem für Referenz- und Konfigurationstests gedacht.
 
-Die Zugangsdaten werden ausschließlich als Umgebungsvariablen gesetzt. Für die
-aktuelle PowerShell-Sitzung:
+Das PAT kann über `JIRA_PAT` oder beim Import mit `--pat` (siehe unten)
+angegeben werden. Für die aktuelle PowerShell-Sitzung:
 
 ```powershell
 $env:JIRA_BASE_URL = "https://jira.example.net"
@@ -143,6 +143,31 @@ zusätzlich direkt an den jeweiligen Xray-Testschritt angehängt.
 Projektabhängige Jira-Felder können über `custom_fields` mit ihren IDs
 (`customfield_12345`) gesetzt werden.
 
+Für den Xray-Test-Repository-Pfad kann im Testfall optional `repository_path`
+gesetzt werden. Das Profil `XRAYTC` ordnet ihn `customfield_15909` zu:
+
+```json
+{
+	"summary": "Mein Testfall",
+	"repository_path": "/Bereich/Unterbereich",
+	"steps": [
+		{
+			"system": "Portal",
+			"action": "Seite öffnen",
+			"expected_result": "Seite ist sichtbar"
+		}
+	]
+}
+```
+
+Der Pfad muss mit `/` beginnen und darf weder leer sein noch mit `/` enden.
+Das Feld wird beim Anlegen des Issues als String übertragen. Der Importer fragt
+danach `customfield_15909` erneut ab und meldet einen Fehler mit dem bereits
+angelegten Issue-Key, falls Jira/Xray den Wert nicht speichert. Das Schreiben
+dieses Xray-Felds wurde bisher nicht an der Zielinstanz verifiziert; vor einem
+größeren Import empfiehlt sich ein einzelner Testfall. Wird das Feld zusätzlich
+in `custom_fields` gesetzt, müssen beide Werte identisch sein.
+
 Welche optionalen Schrittfelder an Xray übertragen werden, legt
 `step_field_mapping` im Projektprofil fest. Nicht konfigurierte Felder werden
 beim Erzeugen des Xray-Payloads ausgelassen. Im Profil `XRAYTC` ist `data`
@@ -160,9 +185,12 @@ python -m xray_import.import_testcases
 
 ### Konfiguration per Kommandozeile überschreiben
 
-Werte aus `config/import_config.json` und dem Projektprofil können beim Aufruf
-überschrieben werden. Es gilt: Kommandozeile vor Umgebungsvariable vor
-Konfigurationsdatei.
+Die folgenden Werte aus `config/import_config.json` und dem Projektprofil
+können beim Aufruf überschrieben werden. Für Jira-URL, Projektschlüssel und
+Issue-Typ gilt: Kommandozeile vor Umgebungsvariable vor Konfigurationsdatei.
+Andere aufgeführte Werte kommen aus der Kommandozeile oder der Konfiguration.
+`--project-profile` wählt ein anderes Profil, ohne die Konfigurationsdatei zu
+ändern. Auch `--schema` benötigt keine temporäre Konfigurationsdatei mehr.
 
 | Option                  | Überschreibt          |
 |-------------------------|-----------------------|
