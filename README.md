@@ -5,6 +5,19 @@ nach Jira/Xray Server bzw. Data Center.
 
 ## Setup
 
+Unter Windows kann der Importer mit `start_testfallimporter.cmd` gestartet
+werden. Beim ersten Start erstellt der Launcher `.venv` und installiert die
+Abhängigkeiten aus `requirements.txt`; dafür sind Python 3.11+ und
+Internetverbindung erforderlich. CLI-Argumente werden weitergereicht. Ohne
+Argumente zeigt der Launcher nur die Hilfe und startet keinen Jira-Import:
+
+```powershell
+.\start_testfallimporter.cmd --pat
+```
+
+Der Import benötigt weiterhin Jira-Netzwerkzugriff und ein PAT, das verdeckt
+abgefragt oder über die bestehende Konfiguration bereitgestellt wird.
+
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
