@@ -17,6 +17,10 @@
       "type": "string",
       "pattern": "^/[^/]+(/[^/]+)*$"
     },
+    "reporter_email": {
+      "type": "string",
+      "minLength": 1
+    },
     "labels": {
       "type": "array",
       "items": {"type": "string", "minLength": 1},

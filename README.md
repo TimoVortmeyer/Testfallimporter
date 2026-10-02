@@ -5,19 +5,6 @@ nach Jira/Xray Server bzw. Data Center.
 
 ## Setup
 
-Unter Windows kann der Importer mit `start_testfallimporter.cmd` gestartet
-werden. Beim ersten Start erstellt der Launcher `.venv` und installiert die
-Abhängigkeiten aus `requirements.txt`; dafür sind Python 3.11+ und
-Internetverbindung erforderlich. CLI-Argumente werden weitergereicht. Ohne
-Argumente zeigt der Launcher nur die Hilfe und startet keinen Jira-Import:
-
-```powershell
-.\start_testfallimporter.cmd --pat
-```
-
-Der Import benötigt weiterhin Jira-Netzwerkzugriff und ein PAT, das verdeckt
-abgefragt oder über die bestehende Konfiguration bereitgestellt wird.
-
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
@@ -180,6 +167,54 @@ angelegten Issue-Key, falls Jira/Xray den Wert nicht speichert. Das Schreiben
 dieses Xray-Felds wurde bisher nicht an der Zielinstanz verifiziert; vor einem
 größeren Import empfiehlt sich ein einzelner Testfall. Wird das Feld zusätzlich
 in `custom_fields` gesetzt, müssen beide Werte identisch sein.
+
+Der Jira-Reporter, der in der Oberfläche als **Autor** angezeigt wird, kann
+optional über `reporter_email` vorgegeben werden. Der Importer sucht damit den
+Jira-Benutzer und setzt das Jira-Feld `reporter` mit dem gefundenen
+Benutzernamen:
+
+```json
+{
+	"summary": "Mein Testfall",
+	"reporter_email": "timo.vortmeyer@example.net",
+	"steps": [
+		{
+			"system": "Portal",
+			"action": "Seite öffnen",
+			"expected_result": "Seite ist sichtbar"
+		}
+	]
+}
+```
+
+Das Feld ist optional. Jira muss den Benutzer über die E-Mail-Suche auffindbar
+machen und die E-Mail-Adresse in der Antwort sichtbar liefern; außerdem muss
+das PAT-Konto Reporter für neue Issues setzen dürfen. Ist die angegebene
+E-Mail-Adresse in Jira nicht exakt auffindbar, wird der PAT-Benutzer als
+Reporter verwendet. Bei mehreren Treffern bricht der Import ab, da der Reporter
+nicht eindeutig ist. Ohne `reporter_email` verwendet Jira weiterhin den
+Standard-Reporter.
+
+Nach dem erfolgreichen Import jedes Testfalls setzt der Importer automatisch
+einen Jira-Kommentar mit folgendem Inhalt:
+
+```text
+Importiert von: <E-Mail des PAT-Benutzers>
+```
+
+Jira speichert den Erstellzeitpunkt des Kommentars separat. Die E-Mail wird über
+`/rest/api/2/myself` ermittelt. Sie muss in Jira sichtbar sein; ist sie nicht
+verfügbar, bricht der Preflight ab, bevor Issues angelegt werden.
+Das PAT-Konto benötigt außerdem die Jira-Berechtigung, Kommentare hinzuzufügen.
+Wird `reporter_email` nicht exakt in Jira gefunden und deshalb der PAT-Benutzer
+als Reporter verwendet, folgt nach dem Importkommentar ein weiterer Kommentar:
+
+```text
+Ersteller in Jira als User nicht gefunden. Emailadresse Ersteller: <E-Mail-Adresse>
+```
+
+Schlägt das Kommentieren nach dem Erstellen eines Issues fehl, nennt der Fehler
+den Issue-Key; vor einem erneuten Import sollte dieser Issue geprüft werden.
 
 Welche optionalen Schrittfelder an Xray übertragen werden, legt
 `step_field_mapping` im Projektprofil fest. Nicht konfigurierte Felder werden

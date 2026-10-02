@@ -38,6 +38,7 @@ def import_testcase(
         custom_fields=testcase.custom_fields,
         steps=testcase.steps,
         repository_path=testcase.repository_path,
+        reporter_email=testcase.reporter_email,
     )
     logger.info("Test-Issue angelegt: %s (%s)", issue_key, testcase.summary)
 
@@ -50,6 +51,8 @@ def import_testcase(
         for filename in step.attachments:
             logger.info("  Step-Attachment hochgeladen: %s", filename)
 
+    jira.add_import_comment(issue_key)
+    logger.info("  Importkommentar gesetzt: %s", issue_key)
     return issue_key
 
 

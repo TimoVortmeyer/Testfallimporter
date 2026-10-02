@@ -153,6 +153,145 @@ class JiraClientDiagnosticsTest(unittest.TestCase):
             )
         self.client._session.post.assert_not_called()
 
+    def test_reporter_email_is_resolved_and_sent_as_reporter(self) -> None:
+        self.client._session.get = Mock(
+            return_value=self.response(
+                200,
+                "",
+                json_body=[
+                    {
+                        "name": "5662440",
+                        "emailAddress": "timo.vortmeyer@example.test",
+                    }
+                ],
+            )
+        )
+        self.client._session.post = Mock(
+            return_value=self.response(201, "", json_body={"key": "TEST-5"})
+        )
+        self.client.update_test_steps = Mock()
+
+        key = self.client.create_test_issue(
+            summary="Referenztest",
+            description="",
+            labels=[],
+            components=[],
+            custom_fields={},
+            steps=[self.step],
+            reporter_email="timo.vortmeyer@example.test",
+        )
+
+        self.assertEqual(key, "TEST-5")
+        self.client._session.get.assert_called_once_with(
+            "https://jira.example.test/rest/api/2/user/search",
+            params={"username": "timo.vortmeyer@example.test"},
+            timeout=30,
+        )
+        fields = self.client._session.post.call_args.kwargs["json"]["fields"]
+        self.assertEqual(fields["reporter"], {"name": "5662440"})
+
+    def test_reporter_email_without_exact_match_falls_back_to_pat_user(self) -> None:
+        self.client._session.get = Mock(
+            side_effect=[
+                self.response(
+                    200,
+                    "",
+                    json_body={
+                        "name": "pat-user",
+                        "emailAddress": "pat@example.test",
+                    },
+                ),
+                self.response(
+                    200,
+                    "",
+                    json_body=[{"name": "5662440", "emailAddress": "other@example.test"}],
+                ),
+            ]
+        )
+        self.client._session.post = Mock(
+            side_effect=[
+                self.response(201, "", json_body={"key": "TEST-7"}),
+                self.response(201, "", json_body={"id": "comment-1"}),
+                self.response(201, "", json_body={"id": "comment-2"}),
+            ]
+        )
+        self.client.update_test_steps = Mock()
+
+        self.client.get_pat_email()
+        key = self.client.create_test_issue(
+            summary="Referenztest",
+            description="",
+            labels=[],
+            components=[],
+            custom_fields={},
+            steps=[self.step],
+            reporter_email="requested@example.test",
+        )
+
+        self.assertEqual(key, "TEST-7")
+        fields = self.client._session.post.call_args_list[0].kwargs["json"]["fields"]
+        self.assertEqual(fields["reporter"], {"name": "pat-user"})
+        self.client.add_import_comment(key)
+        comments = self.client._session.post.call_args_list[1:]
+        self.assertEqual(comments[0].kwargs["json"]["body"], "Importiert von: pat@example.test")
+        self.assertEqual(
+            comments[1].kwargs["json"]["body"],
+            "Ersteller in Jira als User nicht gefunden. Emailadresse Ersteller: "
+            "requested@example.test",
+        )
+
+    def test_ambiguous_reporter_email_does_not_create_issue(self) -> None:
+        matching_user = {"name": "user", "emailAddress": "same@example.test"}
+        self.client._session.get = Mock(
+            return_value=self.response(200, "", json_body=[matching_user, matching_user])
+        )
+        self.client._session.post = Mock()
+
+        with self.assertRaisesRegex(JiraApiError, "nicht eindeutig"):
+            self.client.create_test_issue(
+                summary="Referenztest",
+                description="",
+                labels=[],
+                components=[],
+                custom_fields={},
+                steps=[self.step],
+                reporter_email="same@example.test",
+            )
+        self.client._session.post.assert_not_called()
+
+    def test_import_comment_contains_authenticated_user_email(self) -> None:
+        email = "timo.vortmeyer@example.test"
+        self.client._session.get = Mock(
+            return_value=self.response(200, "", json_body={"emailAddress": email})
+        )
+        self.client._session.post = Mock(
+            return_value=self.response(201, "", json_body={"id": "comment-1"})
+        )
+
+        self.client.get_pat_email()
+        self.client.add_import_comment("TEST-6")
+
+        self.client._session.get.assert_called_once_with(
+            "https://jira.example.test/rest/api/2/myself",
+            timeout=30,
+        )
+        self.client._session.post.assert_called_once()
+        call = self.client._session.post.call_args
+        self.assertEqual(
+            call.args[0],
+            "https://jira.example.test/rest/api/2/issue/TEST-6/comment",
+        )
+        body = call.kwargs["json"]["body"]
+        self.assertEqual(body, f"Importiert von: {email}")
+
+    def test_missing_authenticated_user_email_fails(self) -> None:
+        self.client._session.get = Mock(
+            return_value=self.response(200, "", json_body={"displayName": "Tester"})
+        )
+
+        with self.assertRaisesRegex(JiraApiError, "E-Mail-Adresse des PAT-Benutzers"):
+            self.client.get_pat_email()
+
 
 if __name__ == "__main__":
     unittest.main()

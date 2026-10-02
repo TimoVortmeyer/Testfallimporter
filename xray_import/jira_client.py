@@ -21,6 +21,9 @@ class JiraApiError(Exception):
 class JiraClient:
     def __init__(self, config: Config):
         self._config = config
+        self._pat_email: str | None = None
+        self._pat_username: str | None = None
+        self._reporter_fallback_email: str | None = None
         self._session = requests.Session()
         self._session.headers.update(
             {
@@ -100,6 +103,8 @@ class JiraClient:
             if field_id and field_id not in field_ids:
                 raise JiraApiError(f"Konfiguriertes Jira-Feld nicht gefunden: {field_id}")
 
+        self.get_pat_email()
+
         logger.info(
             "Jira-Preflight erfolgreich: Projekt %s, Issue-Typ %s",
             self._config.project_key,
@@ -115,8 +120,10 @@ class JiraClient:
         custom_fields: dict[str, Any],
         steps: list[TestStep],
         repository_path: str | None = None,
+        reporter_email: str | None = None,
     ) -> str:
         """Legt einen neuen Test-Issue an und gibt den Issue-Key zurück."""
+        self._reporter_fallback_email = None
         fields: dict[str, Any] = {
             "project": {"key": self._config.project_key},
             "issuetype": {"name": self._config.test_issue_type},
@@ -136,6 +143,11 @@ class JiraClient:
                     f"repository_path widerspricht custom_fields.{field_id}"
                 )
             fields[field_id] = repository_path
+        if reporter_email is not None:
+            email = reporter_email.strip()
+            if not email:
+                raise JiraApiError("reporter_email darf nicht leer sein")
+            fields["reporter"] = {"name": self._resolve_reporter(email)}
         fields.setdefault(
             self._config.test_type_custom_field,
             {"value": self._config.manual_test_type_value},
@@ -157,6 +169,98 @@ class JiraClient:
             self.verify_repository_path(issue_key, repository_path)
         self.update_test_steps(issue_key, steps)
         return issue_key
+
+    def _resolve_reporter(self, email: str) -> str:
+        response = self._session.get(
+            f"{self._config.jira_base_url}/rest/api/2/user/search",
+            params={"username": email},
+            timeout=self._config.request_timeout,
+        )
+        if response.status_code != 200:
+            raise JiraApiError(
+                "Reporter konnte über die E-Mail-Adresse nicht in Jira gesucht werden "
+                f"({response_diagnostics(response)})"
+            )
+
+        users = response.json()
+        matches = [
+            user
+            for user in users
+            if isinstance(user, dict)
+            and isinstance(user.get("emailAddress"), str)
+            and user["emailAddress"].casefold() == email.casefold()
+        ]
+        if not matches:
+            if not self._pat_username:
+                raise JiraApiError(
+                    "Reporter-E-Mail nicht auffindbar und Jira-Benutzername des PAT-Kontos "
+                    "nicht verfügbar; Reporter kann nicht gesetzt werden"
+                )
+            logger.warning(
+                "Reporter-E-Mail nicht exakt auffindbar; verwende PAT-Benutzer als Reporter"
+            )
+            self._reporter_fallback_email = email
+            return self._pat_username
+        if len(matches) > 1:
+            raise JiraApiError(
+                "Mehrere Jira-Benutzer haben dieselbe E-Mail-Adresse; Reporter ist nicht eindeutig"
+            )
+        username = matches[0].get("name")
+        if not isinstance(username, str) or not username:
+            raise JiraApiError(
+                "Jira lieferte für den gefundenen Reporter keinen verwendbaren Benutzernamen"
+            )
+        return username
+
+    def get_pat_email(self) -> str:
+        response = self._session.get(
+            f"{self._config.jira_base_url}/rest/api/2/myself",
+            timeout=self._config.request_timeout,
+        )
+        if response.status_code != 200:
+            raise JiraApiError(
+                "E-Mail-Adresse des PAT-Benutzers konnte nicht abgefragt werden "
+                f"({response_diagnostics(response)})"
+            )
+        user = response.json()
+        email = user.get("emailAddress")
+        if not isinstance(email, str) or not email.strip():
+            raise JiraApiError(
+                "E-Mail-Adresse des PAT-Benutzers ist in Jira nicht sichtbar; "
+                "Import wird vor dem Anlegen von Issues abgebrochen"
+            )
+        self._pat_email = email.strip()
+        username = user.get("name")
+        self._pat_username = username.strip() if isinstance(username, str) and username.strip() else None
+        return self._pat_email
+
+    def add_import_comment(self, issue_key: str) -> None:
+        if self._pat_email is None:
+            raise JiraApiError(
+                "E-Mail-Adresse des PAT-Benutzers wurde vor dem Import nicht abgefragt"
+            )
+        body = f"Importiert von: {self._pat_email}"
+        self._post_comment(issue_key, body, "Importkommentar")
+        if self._reporter_fallback_email is not None:
+            fallback_body = (
+                "Ersteller in Jira als User nicht gefunden. Emailadresse Ersteller: "
+                f"{self._reporter_fallback_email}"
+            )
+            self._post_comment(issue_key, fallback_body, "Hinweis zum nicht gefundenen Ersteller")
+            self._reporter_fallback_email = None
+
+    def _post_comment(self, issue_key: str, body: str, comment_description: str) -> None:
+        response = self._session.post(
+            f"{self._config.jira_base_url}/rest/api/2/issue/{issue_key}/comment",
+            json={"body": body},
+            timeout=self._config.request_timeout,
+        )
+        if response.status_code != 201:
+            raise JiraApiError(
+                f"{comment_description} für bereits angelegten Issue {issue_key} konnte nicht "
+                f"gesetzt werden ({response_diagnostics(response)}). "
+                "Issue vor einem erneuten Import prüfen."
+            )
 
     def verify_repository_path(self, issue_key: str, expected_path: str) -> None:
         field_id = self._config.repository_path_custom_field
