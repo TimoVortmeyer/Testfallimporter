@@ -1,0 +1,14 @@
+{
+  "summary": "Label regex 06_cyrillic: expected True",
+  "description": "Expected Jira acceptance: True.",
+  "labels": [
+    "тест"
+  ],
+  "steps": [
+    {
+      "system": "Jira labels",
+      "action": "Create a test issue with the candidate label.",
+      "expected_result": "Jira akzeptiert das Label."
+    }
+  ]
+}

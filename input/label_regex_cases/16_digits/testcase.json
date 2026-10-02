@@ -1,0 +1,14 @@
+{
+  "summary": "Label regex 16_digits: expected True",
+  "description": "Expected Jira acceptance: True.",
+  "labels": [
+    "12345"
+  ],
+  "steps": [
+    {
+      "system": "Jira labels",
+      "action": "Create a test issue with the candidate label.",
+      "expected_result": "Jira akzeptiert das Label."
+    }
+  ]
+}

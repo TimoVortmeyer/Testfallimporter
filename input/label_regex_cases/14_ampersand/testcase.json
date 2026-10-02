@@ -1,0 +1,14 @@
+{
+  "summary": "Label regex 14_ampersand: expected False",
+  "description": "Expected Jira acceptance: False.",
+  "labels": [
+    "test&label"
+  ],
+  "steps": [
+    {
+      "system": "Jira labels",
+      "action": "Create a test issue with the candidate label.",
+      "expected_result": "Jira lehnt das Label ab."
+    }
+  ]
+}

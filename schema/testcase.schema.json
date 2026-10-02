@@ -23,7 +23,7 @@
     },
     "labels": {
       "type": "array",
-      "items": {"type": "string", "minLength": 1},
+      "items": {"type": "string", "minLength": 1, "maxLength": 255, "pattern": "^\\S{1,255}$"},
       "uniqueItems": true
     },
     "components": {

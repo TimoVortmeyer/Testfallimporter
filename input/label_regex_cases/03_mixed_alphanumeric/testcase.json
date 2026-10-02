@@ -1,0 +1,14 @@
+{
+  "summary": "Label regex 03_mixed_alphanumeric: expected True",
+  "description": "Expected Jira acceptance: True.",
+  "labels": [
+    "TestLabel123"
+  ],
+  "steps": [
+    {
+      "system": "Jira labels",
+      "action": "Create a test issue with the candidate label.",
+      "expected_result": "Jira akzeptiert das Label."
+    }
+  ]
+}

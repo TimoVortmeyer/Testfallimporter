@@ -142,6 +142,8 @@ keine automatischen Standardwerte. Die Dateien aus `attachments` werden
 zusätzlich direkt an den jeweiligen Xray-Testschritt angehängt.
 Projektabhängige Jira-Felder können über `custom_fields` mit ihren IDs
 (`customfield_12345`) gesetzt werden.
+Labels müssen 1 bis 255 Zeichen lang sein und dürfen keine Whitespace-Zeichen
+enthalten; ungültige Werte werden bei der Schema-Validierung abgelehnt.
 
 Für den Xray-Test-Repository-Pfad kann im Testfall optional `repository_path`
 gesetzt werden. Das Profil `XRAYTC` ordnet ihn `customfield_15909` zu:

@@ -1,0 +1,14 @@
+{
+  "summary": "Label regex 22_empty_string: expected false",
+  "description": "Empty labels are rejected by the importer JSON schema before Jira.",
+  "labels": [
+    ""
+  ],
+  "steps": [
+    {
+      "system": "Jira labels",
+      "action": "Attempt to create a test issue with an empty label.",
+      "expected_result": "The importer JSON schema rejects the empty label."
+    }
+  ]
+}

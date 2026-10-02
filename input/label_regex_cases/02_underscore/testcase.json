@@ -1,0 +1,14 @@
+{
+  "summary": "Label regex 02_underscore: expected True",
+  "description": "Expected Jira acceptance: True.",
+  "labels": [
+    "test_label"
+  ],
+  "steps": [
+    {
+      "system": "Jira labels",
+      "action": "Create a test issue with the candidate label.",
+      "expected_result": "Jira akzeptiert das Label."
+    }
+  ]
+}
