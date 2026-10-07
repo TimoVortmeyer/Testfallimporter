@@ -129,12 +129,13 @@ Custom-Field-IDs, Step-IDs, verfügbaren Feldoperationen und Attachment-Daten.
 - `config/projects/XRAYTC.json`: Projektprofil mit Jira-Feld-IDs, Step-Mapping,
 	Pflichtfeldern und Xray-API-Version
 - `schema/testcase.schema.json`: verbindliches Schema für eine Testfall-Datei
-- `input/testcases/<testfall-id>/testcase.json`: genau ein Testfall inklusive Steps
+- `input/testcases/<testfall-id>/testcase.json`: genau ein Testfall, optional mit Steps
 - `input/testcases/<testfall-id>/screenshots/`: die zum Testfall gehörenden Bilder
 
 Screenshots werden in Textfeldern des Testfalls über Jira-Wiki-Markup verankert,
 zum Beispiel `!login.png!`. Das Bild muss im jeweiligen `screenshots`-Ordner
-liegen. Das Eingabeformat kennt die Schrittfelder `system`, `action`, `data`,
+liegen. `steps` ist optional; fehlt das Feld, wird der Test ohne Manual-Steps
+angelegt. Das Eingabeformat kennt die Schrittfelder `system`, `action`, `data`,
 `expected_result`, `tester` und `attachments`. `system`, `action` und
 `expected_result` sind Pflichtfelder. Die übrigen Felder sind optional und
 werden nur übertragen, wenn das aktive Projektprofil sie abbildet; es gibt

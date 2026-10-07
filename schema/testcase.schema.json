@@ -4,7 +4,7 @@
   "title": "Xray manual test case",
   "type": "object",
   "additionalProperties": false,
-  "required": ["summary", "steps"],
+  "required": ["summary"],
   "properties": {
     "summary": {
       "type": "string",

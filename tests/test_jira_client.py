@@ -87,6 +87,26 @@ class JiraClientDiagnosticsTest(unittest.TestCase):
         self.assertIn("Ungültiges Step-Feld", message)
         self.assertIn("Step 1", message)
 
+    def test_issue_without_steps_skips_manual_steps(self) -> None:
+        self.client._session.post = Mock(
+            return_value=self.response(201, "", json_body={"key": "TEST-9"})
+        )
+        self.client._session.put = Mock()
+
+        key = self.client.create_test_issue(
+            summary="Ohne Schritte",
+            description="",
+            labels=[],
+            components=[],
+            custom_fields={},
+            steps=[],
+        )
+
+        self.assertEqual(key, "TEST-9")
+        fields = self.client._session.post.call_args.kwargs["json"]["fields"]
+        self.assertNotIn("customfield_15903", fields)
+        self.client._session.put.assert_not_called()
+
     def test_repository_path_is_sent_and_verified(self) -> None:
         repository_path = "/03.02 Einkaufsverwaltung/03.02.001 Pflege Einkaufskonditionen"
         self.client._session.post = Mock(

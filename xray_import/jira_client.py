@@ -152,8 +152,8 @@ class JiraClient:
             self._config.test_type_custom_field,
             {"value": self._config.manual_test_type_value},
         )
-        steps_value = self._steps_value(steps)
-        fields[self._config.manual_steps_custom_field] = steps_value
+        if steps:
+            fields[self._config.manual_steps_custom_field] = self._steps_value(steps)
 
         response = self._session.post(
             f"{self._config.jira_base_url}/rest/api/2/issue",
@@ -167,7 +167,10 @@ class JiraClient:
         issue_key = response.json()["key"]
         if repository_path is not None:
             self.verify_repository_path(issue_key, repository_path)
-        self.update_test_steps(issue_key, steps)
+        if steps:
+            self.update_test_steps(issue_key, steps)
+        else:
+            logger.info("Keine Testschritte für %s vorhanden; Manual-Steps werden nicht gesetzt.", issue_key)
         return issue_key
 
     def _resolve_reporter(self, email: str) -> str:

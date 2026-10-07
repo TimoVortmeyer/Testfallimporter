@@ -10,6 +10,11 @@ from xray_import.models import TestCaseValidationError, load_testcases
 
 
 class LabelSchemaTest(unittest.TestCase):
+    def test_steps_are_optional(self) -> None:
+        schema_path = Path(__file__).resolve().parents[1] / "schema" / "testcase.schema.json"
+        validator = Draft202012Validator(json.loads(schema_path.read_text(encoding="utf-8")))
+        self.assertEqual(list(validator.iter_errors({"summary": "Test"})), [])
+
     def test_labels_require_non_whitespace_and_max_255_characters(self) -> None:
         schema_path = Path(__file__).resolve().parents[1] / "schema" / "testcase.schema.json"
         schema = json.loads(schema_path.read_text(encoding="utf-8"))
