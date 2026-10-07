@@ -229,6 +229,29 @@ Import [############------------] 1/2 (50%) | Laufzeit 00:10 | Gesamt ~00:20 | R
 Sie enthält Anzahl, Prozent, Laufzeit, geschätzte Gesamt- und Restzeit, den
 angelegten Issue-Key (bzw. `Fehler`) und den Testfallordner.
 
+### Logdatei und Ergebnisdatei
+
+Jeder Lauf schreibt in den Ordner `output_dir` (Standard: `output`, überschreibbar
+mit `--output-dir`) zwei Dateien mit Zeitstempel im Namen:
+
+- `import_<JJJJMMTT-HHMMSS>.log`: vollständiges Log des Laufs (ohne Token).
+- `import_ergebnis_<JJJJMMTT-HHMMSS>.csv`: eine Zeile je Testfall, UTF-8 mit BOM,
+  Semikolon als Trennzeichen. Jede Zeile wird sofort gespeichert.
+
+| Spalte | Inhalt |
+|---|---|
+| `testfall` | Summary des Testfalls |
+| `ordner` | Testfallordner |
+| `status` | `angelegt` oder `fehler` |
+| `issue_key` | Angelegter Issue-Key; bei `fehler` nur gefüllt, wenn das Issue bereits angelegt wurde |
+| `link` | Vollständiger Link `<jira_base_url>/browse/<Issue-Key>` |
+| `fehler` | Fehlertyp und Fehlermeldung bei `status = fehler` |
+
+Ist bei `status = fehler` ein Issue-Key gesetzt, wurde das Issue angelegt, aber
+ein späterer Schritt (Anhänge, Kommentar) ist fehlgeschlagen. Dieses Issue vor
+einem erneuten Import prüfen, um Duplikate zu vermeiden. Fehler vor dem Import
+(Konfiguration, Schema-Validierung, Preflight) stehen nur in der Logdatei.
+
 Welche optionalen Schrittfelder an Xray übertragen werden, legt
 `step_field_mapping` im Projektprofil fest. Nicht konfigurierte Felder werden
 beim Erzeugen des Xray-Payloads ausgelassen. Im Profil `XRAYTC` ist `data`
@@ -264,6 +287,7 @@ Andere aufgeführte Werte kommen aus der Kommandozeile oder der Konfiguration.
 | `--schema`              | `schema_path`         |
 | `--project-key`         | `project_key`         |
 | `--test-issue-type`     | `test_issue_type`     |
+| `--output-dir`          | `output_dir`          |
 | `--pat`                 | Umgebungsvariable `JIRA_PAT` |
 
 Beispiel:

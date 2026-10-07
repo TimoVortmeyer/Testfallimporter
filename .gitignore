@@ -20,3 +20,4 @@ __pycache__/
 *.sock
 dist/
 build/
+output/

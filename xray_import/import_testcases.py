@@ -18,10 +18,24 @@ from .config import load_config, load_import_settings
 from .jira_client import JiraApiError, JiraClient
 from .models import TestCase, TestCaseValidationError, load_testcases
 from .progress import ImportProgress
+from .run_output import LOG_FORMAT, ResultWriter, attach_log_file, detach_log_file, run_file_paths
 from .xray_client import XrayApiError, XrayClient
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 logger = logging.getLogger(__name__)
+
+IMPORT_ERRORS = (JiraApiError, XrayApiError, FileNotFoundError, requests.RequestException)
+
+
+class PartialImportError(Exception):
+    """Das Issue wurde angelegt, ein späterer Importschritt ist aber fehlgeschlagen."""
+
+    def __init__(self, issue_key: str, cause: Exception) -> None:
+        super().__init__(
+            f"Issue {issue_key} wurde angelegt, der Import ist aber unvollständig: "
+            f"{type(cause).__name__}: {cause}"
+        )
+        self.issue_key = issue_key
 
 
 def import_testcase(
@@ -43,21 +57,43 @@ def import_testcase(
     )
     logger.info("Test-Issue angelegt: %s (%s)", issue_key, testcase.summary)
 
-    for filename in sorted(testcase.issue_screenshot_filenames()):
-        jira.upload_attachment(issue_key, screenshots_dir / filename)
-        logger.info("  Screenshot hochgeladen: %s", filename)
+    try:
+        for filename in sorted(testcase.issue_screenshot_filenames()):
+            jira.upload_attachment(issue_key, screenshots_dir / filename)
+            logger.info("  Screenshot hochgeladen: %s", filename)
 
-    xray.upload_step_attachments(issue_key, testcase.steps, screenshots_dir)
-    for step in testcase.steps:
-        for filename in step.attachments:
-            logger.info("  Step-Attachment hochgeladen: %s", filename)
+        xray.upload_step_attachments(issue_key, testcase.steps, screenshots_dir)
+        for step in testcase.steps:
+            for filename in step.attachments:
+                logger.info("  Step-Attachment hochgeladen: %s", filename)
 
-    jira.add_import_comment(issue_key)
+        jira.add_import_comment(issue_key)
+    except IMPORT_ERRORS as exc:
+        raise PartialImportError(issue_key, exc) from exc
     logger.info("  Importkommentar gesetzt: %s", issue_key)
     return issue_key
 
 
 def run(config_path: Path, overrides: dict[str, object] | None = None) -> int:
+    try:
+        settings = load_import_settings(config_path, overrides)
+    except (KeyError, OSError, json.JSONDecodeError) as exc:
+        logger.error("Konfigurations-/Eingabefehler: %s", exc)
+        return 1
+    log_path, result_path = run_file_paths(Path(str(settings.get("output_dir", "output"))))
+    try:
+        handler = attach_log_file(log_path)
+    except OSError as exc:
+        logger.error("Logdatei '%s' konnte nicht angelegt werden: %s", log_path, exc)
+        return 1
+    try:
+        logger.info("Logdatei: %s", log_path)
+        return _run(config_path, overrides, result_path)
+    finally:
+        detach_log_file(handler)
+
+
+def _run(config_path: Path, overrides: dict[str, object] | None, result_path: Path) -> int:
     try:
         settings = load_import_settings(config_path, overrides)
         testcases_dir = Path(settings["testcases_dir"])
@@ -83,34 +119,41 @@ def run(config_path: Path, overrides: dict[str, object] | None = None) -> int:
         logger.error("Preflight fehlgeschlagen: %s", exc)
         return 1
     created_keys: list[str] = []
-    had_error = False
+    try:
+        results = ResultWriter(result_path, config.jira_base_url)
+    except OSError as exc:
+        logger.error("Ergebnisdatei '%s' konnte nicht angelegt werden: %s", result_path, exc)
+        return 1
     progress = ImportProgress(len(testcases))
     progress.update(0)
-    for position, (testcase, testcase_dir) in enumerate(testcases, start=1):
-        try:
-            screenshots_dir = testcase_dir / str(settings["screenshots_dirname"])
-            key = import_testcase(testcase, jira, xray, screenshots_dir)
-            created_keys.append(key)
-            status = key
-        except (
-            JiraApiError,
-            XrayApiError,
-            FileNotFoundError,
-            requests.RequestException,
-        ) as exc:
-            had_error = True
-            logger.error(
-                "Fehler bei Testfall '%s' (%s): %s: %s",
-                testcase.summary,
-                testcase_dir / str(settings["testcase_filename"]),
-                type(exc).__name__,
-                exc,
-            )
-            status = "Fehler"
-        progress.update(position, current=testcase_dir.name, status=status)
+    with results:
+        for position, (testcase, testcase_dir) in enumerate(testcases, start=1):
+            try:
+                screenshots_dir = testcase_dir / str(settings["screenshots_dirname"])
+                key = import_testcase(testcase, jira, xray, screenshots_dir)
+                created_keys.append(key)
+                results.success(testcase.summary, testcase_dir.name, key)
+                status = key
+            except (PartialImportError, *IMPORT_ERRORS) as exc:
+                error = f"{type(exc).__name__}: {exc}"
+                logger.error(
+                    "Fehler bei Testfall '%s' (%s): %s",
+                    testcase.summary,
+                    testcase_dir / str(settings["testcase_filename"]),
+                    error,
+                )
+                results.failure(testcase.summary, testcase_dir.name, error, getattr(exc, "issue_key", None))
+                status = "Fehler"
+            progress.update(position, current=testcase_dir.name, status=status)
 
     logger.info("Fertig. Angelegte Test-Issues: %s", ", ".join(created_keys) or "keine")
-    return 1 if had_error else 0
+    logger.info(
+        "Ergebnis: %d angelegt, %d fehlgeschlagen. Ergebnisdatei: %s",
+        results.created,
+        results.failed,
+        results.path,
+    )
+    return 1 if results.failed else 0
 
 
 # (CLI-Option, Konfigurationsschlüssel, Hilfetext)
@@ -123,6 +166,7 @@ CONFIG_OVERRIDE_OPTIONS = (
     ("--schema", "schema_path", "Pfad zum JSON Schema der Testfälle"),
     ("--project-key", "project_key", "Jira-Projektschlüssel"),
     ("--test-issue-type", "test_issue_type", "Name des Test-Issue-Typs"),
+    ("--output-dir", "output_dir", "Ordner für Logdatei und Ergebnisdatei (CSV)"),
 )
 PROMPT_FOR_PAT = object()
 

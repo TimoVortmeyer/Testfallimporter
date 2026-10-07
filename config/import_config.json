@@ -3,5 +3,6 @@
   "project_profile": "config/projects/XRAYTC.json",
   "testcases_dir": "input/testcases",
   "testcase_filename": "testcase.json",
-  "screenshots_dirname": "screenshots"
+  "screenshots_dirname": "screenshots",
+  "output_dir": "output"
 }
