@@ -17,6 +17,7 @@ import requests
 from .config import load_config, load_import_settings
 from .jira_client import JiraApiError, JiraClient
 from .models import TestCase, TestCaseValidationError, load_testcases
+from .progress import ImportProgress
 from .xray_client import XrayApiError, XrayClient
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -83,11 +84,14 @@ def run(config_path: Path, overrides: dict[str, object] | None = None) -> int:
         return 1
     created_keys: list[str] = []
     had_error = False
-    for testcase, testcase_dir in testcases:
+    progress = ImportProgress(len(testcases))
+    progress.update(0)
+    for position, (testcase, testcase_dir) in enumerate(testcases, start=1):
         try:
             screenshots_dir = testcase_dir / str(settings["screenshots_dirname"])
             key = import_testcase(testcase, jira, xray, screenshots_dir)
             created_keys.append(key)
+            status = key
         except (
             JiraApiError,
             XrayApiError,
@@ -102,6 +106,8 @@ def run(config_path: Path, overrides: dict[str, object] | None = None) -> int:
                 type(exc).__name__,
                 exc,
             )
+            status = "Fehler"
+        progress.update(position, current=testcase_dir.name, status=status)
 
     logger.info("Fertig. Angelegte Test-Issues: %s", ", ".join(created_keys) or "keine")
     return 1 if had_error else 0

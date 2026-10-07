@@ -219,6 +219,16 @@ Ersteller in Jira als User nicht gefunden. Emailadresse Ersteller: <E-Mail-Adres
 Schlägt das Kommentieren nach dem Erstellen eines Issues fehl, nennt der Fehler
 den Issue-Key; vor einem erneuten Import sollte dieser Issue geprüft werden.
 
+Während des Imports gibt der Importer nach jedem Testfall eine Fortschrittszeile
+auf der Konsole aus, zum Beispiel:
+
+```text
+Import [############------------] 1/2 (50%) | Laufzeit 00:10 | Gesamt ~00:20 | Rest ~00:10 | TEST-1 | TF_A
+```
+
+Sie enthält Anzahl, Prozent, Laufzeit, geschätzte Gesamt- und Restzeit, den
+angelegten Issue-Key (bzw. `Fehler`) und den Testfallordner.
+
 Welche optionalen Schrittfelder an Xray übertragen werden, legt
 `step_field_mapping` im Projektprofil fest. Nicht konfigurierte Felder werden
 beim Erzeugen des Xray-Payloads ausgelassen. Im Profil `XRAYTC` ist `data`
