@@ -15,6 +15,19 @@ class TestCaseValidationError(Exception):
     """Wird geworfen, wenn die Eingabe-JSON nicht dem erwarteten Schema entspricht."""
 
 
+# Gleiche Regel wie im Konverter: nur sichere Bilddateinamen gelten als Anker, normale "!" bleiben Text.
+_SCREENSHOT_ANCHOR_RE = re.compile(r"!(?=([^!]+)!)")
+_SCREENSHOT_FILENAME_RE = re.compile(r"[^\\/:*?\"<>|!\r\n]+\.(?:png|jpe?g|gif|webp)")
+
+
+def _screenshot_anchors(text: str) -> list[str]:
+    return [
+        name
+        for match in _SCREENSHOT_ANCHOR_RE.finditer(text)
+        if _SCREENSHOT_FILENAME_RE.fullmatch(name := match.group(1))
+    ]
+
+
 @dataclass
 class TestStep:
     action: str
@@ -68,7 +81,7 @@ class TestCase:
 
     def all_screenshot_filenames(self) -> set[str]:
         """Liest alle Wiki-Markup-Bildreferenzen aus den Testfalltexten."""
-        names = set(re.findall(r"!([^!]+)!", self.description))
+        names = set(_screenshot_anchors(self.description))
         names.update(self.screenshots)
         texts = []
         for step in self.steps:
@@ -76,7 +89,7 @@ class TestCase:
         names.update(
             filename
             for text in texts
-            for filename in re.findall(r"!([^!]+)!", text)
+            for filename in _screenshot_anchors(text)
         )
         for step in self.steps:
             names.update(step.attachments)
@@ -85,7 +98,7 @@ class TestCase:
     def issue_screenshot_filenames(self) -> set[str]:
         """Dateien, die als Anhänge am Jira-Test-Issue gespeichert werden."""
         names = set(self.screenshots)
-        names.update(re.findall(r"!([^!]+)!", self.description))
+        names.update(_screenshot_anchors(self.description))
         return names
 
 
