@@ -3,6 +3,8 @@ from __future__ import annotations
 import unittest
 from unittest.mock import Mock
 
+import requests
+
 from xray_import.config import Config
 from xray_import.jira_client import JiraApiError, JiraClient
 from xray_import.models import TestStep
@@ -135,7 +137,7 @@ class JiraClientDiagnosticsTest(unittest.TestCase):
         self.client._session.get.assert_called_once_with(
             "https://jira.example.test/rest/api/2/issue/TEST-3",
             params={"fields": "customfield_15909"},
-            timeout=30,
+            timeout=(10, 60),
         )
 
     def test_unsaved_repository_path_reports_created_issue(self) -> None:
@@ -146,8 +148,7 @@ class JiraClientDiagnosticsTest(unittest.TestCase):
             return_value=self.response(200, "", json_body={"fields": {"customfield_15909": None}})
         )
         self.client.update_test_steps = Mock()
-
-        with self.assertRaisesRegex(JiraApiError, "TEST-4.*nicht gespeichert"):
+        with self.assertRaisesRegex(JiraApiError, "wurde nicht gespeichert"):
             self.client.create_test_issue(
                 summary="Referenztest",
                 description="",
@@ -205,10 +206,27 @@ class JiraClientDiagnosticsTest(unittest.TestCase):
         self.client._session.get.assert_called_once_with(
             "https://jira.example.test/rest/api/2/user/search",
             params={"username": "timo.vortmeyer@example.test"},
-            timeout=30,
+            timeout=(10, 60),
         )
         fields = self.client._session.post.call_args.kwargs["json"]["fields"]
         self.assertEqual(fields["reporter"], {"name": "5662440"})
+
+    def test_create_issue_does_not_retry_ambiguous_connection_reset(self) -> None:
+        self.client._session.post = Mock(
+            side_effect=requests.exceptions.ConnectionError("connection reset")
+        )
+
+        with self.assertRaisesRegex(JiraApiError, "(?i)unklar"):
+            self.client.create_test_issue(
+                summary="Referenztest",
+                description="",
+                labels=[],
+                components=[],
+                custom_fields={},
+                steps=[self.step],
+            )
+
+        self.client._session.post.assert_called_once()
 
     def test_reporter_email_without_exact_match_falls_back_to_pat_user(self) -> None:
         self.client._session.get = Mock(
@@ -232,7 +250,6 @@ class JiraClientDiagnosticsTest(unittest.TestCase):
             side_effect=[
                 self.response(201, "", json_body={"key": "TEST-7"}),
                 self.response(201, "", json_body={"id": "comment-1"}),
-                self.response(201, "", json_body={"id": "comment-2"}),
             ]
         )
         self.client.update_test_steps = Mock()
@@ -251,16 +268,14 @@ class JiraClientDiagnosticsTest(unittest.TestCase):
         self.assertEqual(key, "TEST-7")
         fields = self.client._session.post.call_args_list[0].kwargs["json"]["fields"]
         self.assertEqual(fields["reporter"], {"name": "pat-user"})
-        self.client.add_import_comment(key, "08.10.2026 12:34:56")
+        self.client.add_import_comment(key, "08.10.2026 12:34:56", "TFB_03.docx")
         comments = self.client._session.post.call_args_list[1:]
+        self.assertEqual(len(comments), 1)
+        self.assertEqual(self.client._session.post.call_count, 2)
         self.assertEqual(
             comments[0].kwargs["json"]["body"],
-            "Importiert von: pat@example.test\nImportzeitstempel: 08.10.2026 12:34:56",
-        )
-        self.assertEqual(
-            comments[1].kwargs["json"]["body"],
-            "Ersteller in Jira als User nicht gefunden. Emailadresse Ersteller: "
-            "requested@example.test",
+            "Importiert von: pat@example.test\nImportzeitstempel: 08.10.2026 12:34:56\n"
+            r"Originalworddokument: TFB\_03",
         )
 
     def test_ambiguous_reporter_email_does_not_create_issue(self) -> None:
@@ -296,7 +311,7 @@ class JiraClientDiagnosticsTest(unittest.TestCase):
 
         self.client._session.get.assert_called_once_with(
             "https://jira.example.test/rest/api/2/myself",
-            timeout=30,
+            timeout=(10, 60),
         )
         self.client._session.post.assert_called_once()
         call = self.client._session.post.call_args
@@ -306,6 +321,37 @@ class JiraClientDiagnosticsTest(unittest.TestCase):
         )
         body = call.kwargs["json"]["body"]
         self.assertEqual(body, f"Importiert von: {email}\nImportzeitstempel: 08.10.2026 12:34:56")
+
+    def test_import_comment_filename_endings_and_prepared_doc(self) -> None:
+        self.client._pat_email = "pat@example.test"
+        for filename, expected in (
+            (r"C:\private\TFB_1.docx", r"TFB\_1"),
+            (r"C:\private\TFB_2.doc", r"TFB\_2"),
+            (r"C:\prepared\TFB_3.doc.docx", r"TFB\_3"),
+            (r"C:\prepared\TFB_3.v2.docx", r"TFB\_3.v2"),
+            (r"C:\private\TFB_[one]*<A>.docx", r"TFB\_\[one\]\*\<A\>"),
+            ("TFB_Rückverfolgung_Ä.docx", r"TFB\_Rückverfolgung\_Ä"),
+        ):
+            with self.subTest(filename=filename):
+                self.client._session.post = Mock(
+                    return_value=self.response(201, "", json_body={"id": "comment"})
+                )
+                self.client.add_import_comment("TEST-8", "08.10.2026 12:34:56", filename)
+                body = self.client._session.post.call_args.kwargs["json"]["body"]
+                self.assertEqual(body.splitlines()[-1], f"Originalworddokument: {expected}")
+                self.assertNotIn("private", body)
+
+    def test_import_comment_without_legacy_source_has_only_existing_two_lines(self) -> None:
+        email = "timo.vortmeyer@example.test"
+        self.client._pat_email = email
+        self.client._session.post = Mock(
+            return_value=self.response(201, "", json_body={"id": "comment"})
+        )
+        self.client.add_import_comment("TEST-9", "08.10.2026 12:34:56")
+        self.assertEqual(
+            self.client._session.post.call_args.kwargs["json"]["body"],
+            f"Importiert von: {email}\nImportzeitstempel: 08.10.2026 12:34:56",
+        )
 
     def test_missing_authenticated_user_email_fails(self) -> None:
         self.client._session.get = Mock(

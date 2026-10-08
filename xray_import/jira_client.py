@@ -4,11 +4,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 import logging
+import re
+from pathlib import PureWindowsPath
 
 import requests
 
 from .config import Config
 from .diagnostics import response_diagnostics
+from .http_session import create_retry_session
 from .models import TestStep
 
 logger = logging.getLogger(__name__)
@@ -24,7 +27,7 @@ class JiraClient:
         self._pat_email: str | None = None
         self._pat_username: str | None = None
         self._reporter_fallback_email: str | None = None
-        self._session = requests.Session()
+        self._session = create_retry_session()
         self._session.headers.update(
             {
                 "Authorization": f"Bearer {config.personal_access_token}",
@@ -37,7 +40,7 @@ class JiraClient:
         """Prüft Zielprojekt, Issue-Typ und konfigurierte Jira-Felder."""
         project_response = self._session.get(
             f"{self._config.jira_base_url}/rest/api/2/project/{self._config.project_key}",
-            timeout=self._config.request_timeout,
+            timeout=self._config.request_timeout_pair,
         )
         if project_response.status_code != 200:
             raise JiraApiError(
@@ -51,7 +54,7 @@ class JiraClient:
                 "projectKeys": self._config.project_key,
                 "expand": "projects.issuetypes",
             },
-            timeout=self._config.request_timeout,
+            timeout=self._config.request_timeout_pair,
         )
         if meta_response.status_code == 200:
             projects = meta_response.json().get("projects", [])
@@ -63,7 +66,7 @@ class JiraClient:
         elif meta_response.status_code == 404:
             type_response = self._session.get(
                 f"{self._config.jira_base_url}/rest/api/2/issuetype",
-                timeout=self._config.request_timeout,
+                timeout=self._config.request_timeout_pair,
             )
             if type_response.status_code != 200:
                 raise JiraApiError(
@@ -87,7 +90,7 @@ class JiraClient:
 
         fields_response = self._session.get(
             f"{self._config.jira_base_url}/rest/api/2/field",
-            timeout=self._config.request_timeout,
+            timeout=self._config.request_timeout_pair,
         )
         if fields_response.status_code != 200:
             raise JiraApiError(
@@ -155,11 +158,25 @@ class JiraClient:
         if steps:
             fields[self._config.manual_steps_custom_field] = self._steps_value(steps)
 
-        response = self._session.post(
-            f"{self._config.jira_base_url}/rest/api/2/issue",
-            json={"fields": fields},
-            timeout=self._config.request_timeout,
-        )
+        try:
+            response = self._session.post(
+                f"{self._config.jira_base_url}/rest/api/2/issue",
+                json={"fields": fields},
+                timeout=self._config.request_timeout_pair,
+            )
+        except requests.exceptions.ConnectTimeout:
+            raise
+        except requests.exceptions.Timeout as exc:
+            raise JiraApiError(
+                "Antwort beim Anlegen des Jira-Issues ist ausgeblieben; das Ergebnis ist unklar. "
+                "Vor einem erneuten Import nach der Summary suchen, um Duplikate zu vermeiden."
+            ) from exc
+        except requests.exceptions.ConnectionError as exc:
+            raise JiraApiError(
+                "Verbindung während des Anlegens von Jira-Issue unterbrochen; "
+                "ob das Issue angelegt wurde, ist unklar. Vor einem erneuten Import "
+                "nach der Summary suchen, um Duplikate zu vermeiden."
+            ) from exc
         if response.status_code != 201:
             raise JiraApiError(
                 f"Anlegen des Test-Issues fehlgeschlagen ({response_diagnostics(response)})"
@@ -177,7 +194,7 @@ class JiraClient:
         response = self._session.get(
             f"{self._config.jira_base_url}/rest/api/2/user/search",
             params={"username": email},
-            timeout=self._config.request_timeout,
+            timeout=self._config.request_timeout_pair,
         )
         if response.status_code != 200:
             raise JiraApiError(
@@ -218,7 +235,7 @@ class JiraClient:
     def get_pat_email(self) -> str:
         response = self._session.get(
             f"{self._config.jira_base_url}/rest/api/2/myself",
-            timeout=self._config.request_timeout,
+            timeout=self._config.request_timeout_pair,
         )
         if response.status_code != 200:
             raise JiraApiError(
@@ -237,26 +254,25 @@ class JiraClient:
         self._pat_username = username.strip() if isinstance(username, str) and username.strip() else None
         return self._pat_email
 
-    def add_import_comment(self, issue_key: str, import_timestamp: str) -> None:
+    def add_import_comment(self, issue_key: str, import_timestamp: str, source_word_filename: str | None = None) -> None:
         if self._pat_email is None:
             raise JiraApiError(
                 "E-Mail-Adresse des PAT-Benutzers wurde vor dem Import nicht abgefragt"
             )
-        body = f"Importiert von: {self._pat_email}\nImportzeitstempel: {import_timestamp}"
+        lines = [f"Importiert von: {self._pat_email}", f"Importzeitstempel: {import_timestamp}"]
+        if source_word_filename:
+            lines.append(f"Originalworddokument: {_display_word_name(source_word_filename)}")
+        body = "\n".join(lines)
         self._post_comment(issue_key, body, "Importkommentar")
         if self._reporter_fallback_email is not None:
-            fallback_body = (
-                "Ersteller in Jira als User nicht gefunden. Emailadresse Ersteller: "
-                f"{self._reporter_fallback_email}"
-            )
-            self._post_comment(issue_key, fallback_body, "Hinweis zum nicht gefundenen Ersteller")
+            logger.warning("Reporter-Fallback für %s: PAT-Benutzer wurde verwendet.", issue_key)
             self._reporter_fallback_email = None
 
     def _post_comment(self, issue_key: str, body: str, comment_description: str) -> None:
         response = self._session.post(
             f"{self._config.jira_base_url}/rest/api/2/issue/{issue_key}/comment",
             json={"body": body},
-            timeout=self._config.request_timeout,
+            timeout=self._config.request_timeout_pair,
         )
         if response.status_code != 201:
             raise JiraApiError(
@@ -270,7 +286,7 @@ class JiraClient:
         response = self._session.get(
             f"{self._config.jira_base_url}/rest/api/2/issue/{issue_key}",
             params={"fields": field_id},
-            timeout=self._config.request_timeout,
+            timeout=self._config.request_timeout_pair,
         )
         if response.status_code != 200:
             raise JiraApiError(
@@ -332,7 +348,7 @@ class JiraClient:
                     ]
                 }
             },
-            timeout=self._config.request_timeout,
+            timeout=self._config.request_timeout_pair,
         )
         logger.info(
             "Manual-Steps-Update für %s: HTTP %s",
@@ -350,7 +366,7 @@ class JiraClient:
         verify_response = self._session.get(
             f"{self._config.jira_base_url}/rest/api/2/issue/{issue_key}",
             params={"fields": self._config.manual_steps_custom_field},
-            timeout=self._config.request_timeout,
+            timeout=self._config.request_timeout_pair,
         )
         logger.info(
             "Manual-Steps-Verifikation für %s: HTTP %s",
@@ -380,7 +396,7 @@ class JiraClient:
             xray_response = self._session.get(
                 f"{self._config.jira_base_url}/rest/raven/"
                 f"{self._config.xray_api_version}/api/test/{issue_key}/step",
-                timeout=self._config.request_timeout,
+                timeout=self._config.request_timeout_pair,
             )
             raise JiraApiError(
                 f"Jira/Xray hat für {issue_key} nur {len(stored_steps)} von "
@@ -405,10 +421,22 @@ class JiraClient:
                 f"{self._config.jira_base_url}/rest/api/2/issue/{issue_key}/attachments",
                 headers={"X-Atlassian-Token": "no-check"},
                 files={"file": (file_path.name, f)},
-                timeout=self._config.request_timeout,
+                timeout=self._config.request_timeout_pair,
             )
         if response.status_code != 200:
             raise JiraApiError(
                 f"Upload von '{file_path.name}' an {issue_key} fehlgeschlagen "
                 f"({response_diagnostics(response)})"
             )
+
+
+def _display_word_name(value: str) -> str:
+    basename = PureWindowsPath(value.replace("/", "\\")).name
+    if not basename:
+        raise JiraApiError("Originalworddokument-Dateiname ist leer")
+    path = Path(basename)
+    suffix = path.suffix.casefold()
+    display_name = path.stem if suffix in {".doc", ".docx"} else basename
+    if suffix == ".docx" and Path(display_name).suffix.casefold() == ".doc":
+        display_name = Path(display_name).stem
+    return re.sub(r"([\\*_+~^{}\[\]!|<>])", r"\\\1", display_name)

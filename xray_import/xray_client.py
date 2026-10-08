@@ -10,6 +10,7 @@ import requests
 
 from .config import Config
 from .diagnostics import response_diagnostics
+from .http_session import create_retry_session
 from .models import TestStep
 
 logger = logging.getLogger(__name__)
@@ -22,7 +23,7 @@ class XrayApiError(Exception):
 class XrayClient:
     def __init__(self, config: Config):
         self._config = config
-        self._session = requests.Session()
+        self._session = create_retry_session()
         self._session.headers.update(
             {
                 "Authorization": f"Bearer {config.personal_access_token}",
@@ -37,7 +38,7 @@ class XrayClient:
         response = self._session.get(
             f"{self._config.jira_base_url}/rest/raven/{self._config.xray_api_version}"
             "/api/settings/teststepstatuses",
-            timeout=self._config.request_timeout,
+            timeout=self._config.request_timeout_pair,
         )
         if response.status_code != 200:
             raise XrayApiError(
@@ -59,7 +60,7 @@ class XrayClient:
         response = self._session.get(
             f"{self._config.jira_base_url}/rest/raven/{self._config.xray_api_version}/api/test/"
             f"{test_issue_key}/step",
-            timeout=self._config.request_timeout,
+            timeout=self._config.request_timeout_pair,
         )
         if response.status_code != 200:
             raise XrayApiError(
@@ -95,7 +96,7 @@ class XrayClient:
                     f"{self._config.jira_base_url}/rest/raven/{self._config.xray_api_version}/api/test/"
                     f"{test_issue_key}/step/{step_id}",
                     json={"attachments": {"add": [payload]}},
-                    timeout=self._config.request_timeout,
+                    timeout=self._config.request_timeout_pair,
                 )
                 if upload_response.status_code not in (200, 201):
                     raise XrayApiError(

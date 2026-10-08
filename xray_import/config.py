@@ -19,7 +19,8 @@ class Config:
     test_issue_type: str
     personal_access_token: str
     verify_ssl: bool = True
-    request_timeout: int = 30
+    request_timeout: int = 60
+    connect_timeout: int = 10
     step_field_mapping: dict[str, str] = field(default_factory=lambda: {
         "system": "System/Komponente",
         "action": "Action",
@@ -28,6 +29,11 @@ class Config:
     })
     xray_api_version: str = "1.0"
     repository_path_custom_field: str | None = None
+
+    @property
+    def request_timeout_pair(self) -> tuple[int, int]:
+        """Connect-/Response-Timeout; Response-Zeit bleibt unabhängig begrenzt auf 60 s."""
+        return (min(max(self.connect_timeout, 1), 10), min(max(self.request_timeout, 1), 60))
 
 
 def load_import_settings(
@@ -84,6 +90,8 @@ def load_config(
         project_key=project_key,
         test_issue_type=test_issue_type,
         personal_access_token=pat,
+        request_timeout=int(import_config.get("request_timeout", 60)),
+        connect_timeout=int(import_config.get("connect_timeout", 10)),
         step_field_mapping=import_config["step_field_mapping"],
         xray_api_version=import_config["xray_api_version"],
         repository_path_custom_field=import_config.get("repository_path_custom_field"),

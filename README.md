@@ -35,6 +35,7 @@ Ein minimaler Referenztestfall kann beispielsweise so aussehen:
 ```json
 {
 	"summary": "Beispieltestfall Feldmapping",
+	"source_word_filename": "TFB_Beispieltestfall.docx",
 	"description": "Ein einfacher Beispielablauf mit einem sichtbaren Ergebnis.",
 	"labels": [],
 	"components": [],
@@ -141,6 +142,9 @@ angelegt. Das Eingabeformat kennt die Schrittfelder `system`, `action`, `data`,
 werden nur übertragen, wenn das aktive Projektprofil sie abbildet; es gibt
 keine automatischen Standardwerte. Die Dateien aus `attachments` werden
 zusätzlich direkt an den jeweiligen Xray-Testschritt angehängt.
+Der Konverter setzt außerdem optional `source_word_filename` auf den ursprünglichen
+Word-Dateinamen einschließlich Endung, ohne Verzeichnispfad. Fehlt dieses Feld in
+älteren Testfalldateien, wird kein Originaldokument-Kommentar geschrieben.
 Projektabhängige Jira-Felder können über `custom_fields` mit ihren IDs
 (`customfield_12345`) gesetzt werden.
 Labels müssen 1 bis 255 Zeichen lang sein und dürfen keine Whitespace-Zeichen
@@ -204,21 +208,26 @@ einen Jira-Kommentar mit folgendem Inhalt:
 ```text
 Importiert von: <E-Mail des PAT-Benutzers>
 Importzeitstempel: <DD.MM.YYYY hh:mm:ss>
+Originalworddokument: <DATEINAME OHNE ERWEITERUNG>
 ```
 
+Das sind die einzigen drei Kommentarzeilen und genau ein Kommentar pro Issue.
 Der Zeitstempel wird beim Start des Gesamtimports einmal erfasst und ist bei
-allen Testfällen desselben Laufs identisch.
+allen Testfällen desselben Laufs identisch. Bei älteren JSON-Dateien ohne das
+optionale `source_word_filename` enthält derselbe Kommentar nur die ersten
+beiden Zeilen; Ordnernamen werden nicht als Originaldateiname ausgegeben.
+`.docx` und `.doc` werden entfernt. Für das dokumentierte Prepare-Artefakt
+`name.doc.docx` wird ebenfalls `name` verwendet; weitere Namensbestandteile
+bleiben erhalten. Ein Reporter-Fallback wird im Log vermerkt, erzeugt aber
+keinen zusätzlichen Jira-Kommentar.
 
 Jira speichert den Erstellzeitpunkt des Kommentars separat. Die E-Mail wird über
 `/rest/api/2/myself` ermittelt. Sie muss in Jira sichtbar sein; ist sie nicht
 verfügbar, bricht der Preflight ab, bevor Issues angelegt werden.
 Das PAT-Konto benötigt außerdem die Jira-Berechtigung, Kommentare hinzuzufügen.
 Wird `reporter_email` nicht exakt in Jira gefunden und deshalb der PAT-Benutzer
-als Reporter verwendet, folgt nach dem Importkommentar ein weiterer Kommentar:
-
-```text
-Ersteller in Jira als User nicht gefunden. Emailadresse Ersteller: <E-Mail-Adresse>
-```
+als Reporter verwendet, wird der Fallback im Importlog protokolliert. Die
+Ein-Kommentar-Regel bleibt dabei erhalten.
 
 Schlägt das Kommentieren nach dem Erstellen eines Issues fehl, nennt der Fehler
 den Issue-Key; vor einem erneuten Import sollte dieser Issue geprüft werden.
@@ -319,6 +328,21 @@ bindet sie per Jira-Wiki-Markup (`!datei.png!`) direkt in die Beschreibung bzw.
 das Expected Result des jeweiligen Schritts ein, sodass sie in Xray sichtbar
 sind. Die manuellen Schritte werden beim Anlegen des Jira-Issues im konfigurierten
 Manual-Steps-Custom-Field mit den projektspezifischen Step-Feldern übertragen.
+
+Jira-/Xray-Aufrufe haben höchstens 10 Sekunden Connect-Timeout und höchstens
+60 Sekunden Response-Timeout je Versuch. Sichere GET-/PUT-Aufrufe sowie HTTP
+502/503/504 werden maximal zweimal mit kurzer exponentieller Pause wiederholt;
+Retry-Versuche und ausgeschöpfte Retries stehen im Log.
+Die Rohwerte können optional als `connect_timeout` und `request_timeout` in
+`import_config.json` angegeben werden; effektive Werte sind auf 10 bzw. 60
+Sekunden begrenzt.
+
+POST wird nur bei Connect-Timeout wiederholt, wenn die Verbindung nicht zustande
+kam. Bei Verbindungsabbruch nach dem Senden wird ein Issue-, Kommentar- oder
+Attachment-POST nicht automatisch erneut gesendet, da Jira/Xray die Änderung
+bereits ausgeführt haben könnte. Beim Issue-Anlegen meldet der Importer dann ein
+unklares Ergebnis. Vor einem erneuten Import muss in Jira nach der Summary
+gesucht werden, um Duplikate zu vermeiden.
 
 ### Fehlerdiagnose
 

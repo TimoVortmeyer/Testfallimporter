@@ -69,7 +69,7 @@ def import_testcase(
             for filename in step.attachments:
                 logger.info("  Step-Attachment hochgeladen: %s", filename)
 
-        jira.add_import_comment(issue_key, import_timestamp)
+        jira.add_import_comment(issue_key, import_timestamp, testcase.source_word_filename)
     except IMPORT_ERRORS as exc:
         raise PartialImportError(issue_key, exc) from exc
     logger.info("  Importkommentar gesetzt: %s", issue_key)

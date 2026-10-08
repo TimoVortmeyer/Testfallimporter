@@ -6,6 +6,7 @@ from pathlib import Path
 import json
 import re
 from copy import deepcopy
+from pathlib import PureWindowsPath
 from typing import Any
 
 from jsonschema import Draft202012Validator
@@ -52,6 +53,7 @@ class TestStep:
 @dataclass
 class TestCase:
     summary: str
+    source_word_filename: str | None = None
     description: str = ""
     repository_path: str | None = None
     reporter_email: str | None = None
@@ -69,6 +71,7 @@ class TestCase:
         ]
         return TestCase(
             summary=raw["summary"],
+            source_word_filename=_source_filename(raw.get("source_word_filename")),
             description=raw.get("description", ""),
             repository_path=raw.get("repository_path"),
             reporter_email=raw.get("reporter_email"),
@@ -100,6 +103,12 @@ class TestCase:
         names = set(self.screenshots)
         names.update(_screenshot_anchors(self.description))
         return names
+
+
+def _source_filename(value: Any) -> str | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    return PureWindowsPath(value.replace("/", "\\")).name
 
 
 def load_testcases(

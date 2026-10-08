@@ -24,7 +24,9 @@ class RunOutputTest(unittest.TestCase):
         testcases_dir = root / "testcases"
         for folder, summary in (("a_ok", "TF OK"), ("b_teilweise", "TF Teilweise"), ("c_fehler", "TF Fehler")):
             (testcases_dir / folder).mkdir(parents=True)
-            (testcases_dir / folder / "testcase.json").write_text(json.dumps({"summary": summary}), encoding="utf-8")
+            (testcases_dir / folder / "testcase.json").write_text(
+                json.dumps({"summary": summary, "source_word_filename": f"{folder}.docx"}), encoding="utf-8"
+            )
         profile = root / "profile.json"
         profile.write_text(
             json.dumps({

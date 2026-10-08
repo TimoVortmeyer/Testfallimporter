@@ -88,6 +88,11 @@ class ConfigOverrideTest(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 load_config(self.config_path)
 
+    def test_request_timeout_pair_is_bounded(self) -> None:
+        with patch.dict(os.environ, {"JIRA_PAT": "token"}, clear=True):
+            config = load_config(self.config_path)
+        self.assertEqual(config.request_timeout_pair, (10, 60))
+
 
 if __name__ == "__main__":
     unittest.main()
