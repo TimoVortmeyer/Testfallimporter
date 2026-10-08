@@ -251,9 +251,12 @@ class JiraClientDiagnosticsTest(unittest.TestCase):
         self.assertEqual(key, "TEST-7")
         fields = self.client._session.post.call_args_list[0].kwargs["json"]["fields"]
         self.assertEqual(fields["reporter"], {"name": "pat-user"})
-        self.client.add_import_comment(key)
+        self.client.add_import_comment(key, "08.10.2026 12:34:56")
         comments = self.client._session.post.call_args_list[1:]
-        self.assertEqual(comments[0].kwargs["json"]["body"], "Importiert von: pat@example.test")
+        self.assertEqual(
+            comments[0].kwargs["json"]["body"],
+            "Importiert von: pat@example.test\nImportzeitstempel: 08.10.2026 12:34:56",
+        )
         self.assertEqual(
             comments[1].kwargs["json"]["body"],
             "Ersteller in Jira als User nicht gefunden. Emailadresse Ersteller: "
@@ -289,7 +292,7 @@ class JiraClientDiagnosticsTest(unittest.TestCase):
         )
 
         self.client.get_pat_email()
-        self.client.add_import_comment("TEST-6")
+        self.client.add_import_comment("TEST-6", "08.10.2026 12:34:56")
 
         self.client._session.get.assert_called_once_with(
             "https://jira.example.test/rest/api/2/myself",
@@ -302,7 +305,7 @@ class JiraClientDiagnosticsTest(unittest.TestCase):
             "https://jira.example.test/rest/api/2/issue/TEST-6/comment",
         )
         body = call.kwargs["json"]["body"]
-        self.assertEqual(body, f"Importiert von: {email}")
+        self.assertEqual(body, f"Importiert von: {email}\nImportzeitstempel: 08.10.2026 12:34:56")
 
     def test_missing_authenticated_user_email_fails(self) -> None:
         self.client._session.get = Mock(

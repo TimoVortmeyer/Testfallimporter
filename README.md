@@ -203,7 +203,11 @@ einen Jira-Kommentar mit folgendem Inhalt:
 
 ```text
 Importiert von: <E-Mail des PAT-Benutzers>
+Importzeitstempel: <DD.MM.YYYY hh:mm:ss>
 ```
+
+Der Zeitstempel wird beim Start des Gesamtimports einmal erfasst und ist bei
+allen Testfällen desselben Laufs identisch.
 
 Jira speichert den Erstellzeitpunkt des Kommentars separat. Die E-Mail wird über
 `/rest/api/2/myself` ermittelt. Sie muss in Jira sichtbar sein; ist sie nicht

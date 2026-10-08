@@ -6,6 +6,7 @@ Nutzung:
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 import getpass
 import json
 import logging
@@ -43,6 +44,7 @@ def import_testcase(
     jira: JiraClient,
     xray: XrayClient,
     screenshots_dir: Path,
+    import_timestamp: str,
 ) -> str:
     """Legt einen einzelnen Testfall inkl. Steps und Screenshots an. Gibt den Issue-Key zurück."""
     issue_key = jira.create_test_issue(
@@ -67,7 +69,7 @@ def import_testcase(
             for filename in step.attachments:
                 logger.info("  Step-Attachment hochgeladen: %s", filename)
 
-        jira.add_import_comment(issue_key)
+        jira.add_import_comment(issue_key, import_timestamp)
     except IMPORT_ERRORS as exc:
         raise PartialImportError(issue_key, exc) from exc
     logger.info("  Importkommentar gesetzt: %s", issue_key)
@@ -75,6 +77,7 @@ def import_testcase(
 
 
 def run(config_path: Path, overrides: dict[str, object] | None = None) -> int:
+    import_timestamp = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
     try:
         settings = load_import_settings(config_path, overrides)
     except (KeyError, OSError, json.JSONDecodeError) as exc:
@@ -88,12 +91,17 @@ def run(config_path: Path, overrides: dict[str, object] | None = None) -> int:
         return 1
     try:
         logger.info("Logdatei: %s", log_path)
-        return _run(config_path, overrides, result_path)
+        return _run(config_path, overrides, result_path, import_timestamp)
     finally:
         detach_log_file(handler)
 
 
-def _run(config_path: Path, overrides: dict[str, object] | None, result_path: Path) -> int:
+def _run(
+    config_path: Path,
+    overrides: dict[str, object] | None,
+    result_path: Path,
+    import_timestamp: str,
+) -> int:
     try:
         settings = load_import_settings(config_path, overrides)
         testcases_dir = Path(settings["testcases_dir"])
@@ -130,7 +138,7 @@ def _run(config_path: Path, overrides: dict[str, object] | None, result_path: Pa
         for position, (testcase, testcase_dir) in enumerate(testcases, start=1):
             try:
                 screenshots_dir = testcase_dir / str(settings["screenshots_dirname"])
-                key = import_testcase(testcase, jira, xray, screenshots_dir)
+                key = import_testcase(testcase, jira, xray, screenshots_dir, import_timestamp)
                 created_keys.append(key)
                 results.success(testcase.summary, testcase_dir.name, key)
                 status = key

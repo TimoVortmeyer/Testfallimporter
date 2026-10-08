@@ -53,7 +53,10 @@ class RunOutputTest(unittest.TestCase):
         )
 
     def test_writes_log_and_result_file_with_links_and_errors(self) -> None:
-        def fake_import(testcase, jira, xray, screenshots_dir):
+        timestamps = []
+
+        def fake_import(testcase, jira, xray, screenshots_dir, import_timestamp):
+            timestamps.append(import_timestamp)
             if testcase.summary == "TF OK":
                 return "TEST-1"
             if testcase.summary == "TF Teilweise":
@@ -70,6 +73,9 @@ class RunOutputTest(unittest.TestCase):
             result = import_testcases.run(self.config_path)
 
         self.assertEqual(result, 1)
+        self.assertEqual(len(timestamps), 3)
+        self.assertEqual(len(set(timestamps)), 1)
+        self.assertRegex(timestamps[0], r"^\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2}$")
         log_files = list(self.output_dir.glob("import_*.log"))
         result_files = list(self.output_dir.glob("import_ergebnis_*.csv"))
         self.assertEqual(len(log_files), 1)

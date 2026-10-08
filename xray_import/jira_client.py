@@ -237,12 +237,12 @@ class JiraClient:
         self._pat_username = username.strip() if isinstance(username, str) and username.strip() else None
         return self._pat_email
 
-    def add_import_comment(self, issue_key: str) -> None:
+    def add_import_comment(self, issue_key: str, import_timestamp: str) -> None:
         if self._pat_email is None:
             raise JiraApiError(
                 "E-Mail-Adresse des PAT-Benutzers wurde vor dem Import nicht abgefragt"
             )
-        body = f"Importiert von: {self._pat_email}"
+        body = f"Importiert von: {self._pat_email}\nImportzeitstempel: {import_timestamp}"
         self._post_comment(issue_key, body, "Importkommentar")
         if self._reporter_fallback_email is not None:
             fallback_body = (
